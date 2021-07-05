@@ -329,3 +329,6 @@ To use the EdgeCA GraphQL server as a remote schema with Hashura,
   - GraphQL server URL: http://`your-ip-address`:8888/query   
 
 6. In the GraphiQL query windows enter the mutation as above and run.
+
+### Envoy Secret Discovery Service (SDS) support
+EdgeCA has basic support for Envoy SDS, using the `--sds` argument. See the [Examples](https://github.com/edgesec-org/edgeca/tree/main/examples/sds) for more information
