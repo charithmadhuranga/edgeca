@@ -19,6 +19,7 @@ import (
 	"context"
 	"crypto/x509/pkix"
 	"log"
+	"time"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	tls "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
@@ -63,6 +64,7 @@ func (s *server) StreamSecrets(stream secretservice.SecretDiscoveryService_Strea
 			}
 			select {
 			case reqCh <- req:
+
 			case <-stream.Context().Done():
 				return
 			case <-s.ctx.Done():
@@ -71,31 +73,33 @@ func (s *server) StreamSecrets(stream secretservice.SecretDiscoveryService_Strea
 		}
 	}()
 
-	select {
-	case <-s.ctx.Done():
-		return nil
-	case req, more := <-reqCh:
-		// input stream ended or errored out
-		if !more {
+	for {
+		select {
+		case <-s.ctx.Done():
 			return nil
-		}
-		if req == nil {
-			return status.Errorf(codes.Unavailable, "empty request")
-		}
+		case req, more := <-reqCh:
+			// input stream ended or errored out
+			if !more {
+				return nil
+			}
+			if req == nil {
+				return status.Errorf(codes.Unavailable, "empty request")
+			}
 
-		// nonces can be reused across streams; we verify nonce only if nonce is not initialized
-		//nonce := req.GetResponseNonce()
+			// nonces can be reused across streams; we verify nonce only if nonce is not initialized
+			//nonce := req.GetResponseNonce()
 
-		hostname := req.GetResourceNames()[0]
-		resp, _ := getResponse(hostname)
-		s.streamCount++
-		log.Printf("SDS: Processing request for certificates for %v", req.GetResourceNames())
-		stream.Send(resp)
+			hostname := req.GetResourceNames()[0]
+			resp, _ := getResponse(hostname)
+			s.streamCount++
+			//		log.Printf("SDS: Processing request for certificates for %v", req.GetResourceNames())
+			stream.Send(resp)
+
+		}
+		time.Sleep(1000 * time.Millisecond)
+
 	}
 
-	//	stream.Send()
-
-	return nil
 }
 
 func (s *server) FetchSecrets(ctx context.Context, req *discovery.DiscoveryRequest) (*discovery.DiscoveryResponse, error) {
@@ -115,7 +119,16 @@ type Resource interface {
 	proto.Message
 }
 
+type secret struct {
+	certificate string
+	key         string
+}
+
+var secrets map[string]secret
+
 func InjectSDSServer(grpcServer *grpc.Server) {
+
+	secrets = make(map[string]secret)
 
 	context := context.Background()
 	srv := &server{
@@ -127,9 +140,23 @@ func InjectSDSServer(grpcServer *grpc.Server) {
 }
 
 func generateSDSCertificate(host string) (pemCert, pemKey string, err error) {
+	var pemCertificateString, pemPrivateKeyString string
 
-	pemCertificate, pemPrivateKey, _, err := certs.GeneratePemCertificate(pkix.Name{CommonName: host}, state.GetSubCACert(), state.GetSubCAKey())
-	return string(pemCertificate), string(pemPrivateKey), err
+	if state.UsingPassthrough() {
+		log.Println("SDS: Using TPP to sign certificate for " + host)
+
+		_, pemCertificateString, pemPrivateKeyString, err = state.GenerateCertificateUsingTPP(pkix.Name{CommonName: host})
+
+	} else {
+		log.Println("SDS: Using EdgeCA issuing certificate to sign certificate for " + host)
+
+		var pemCertificate, pemPrivateKey []byte
+		pemCertificate, pemPrivateKey, _, err = certs.GeneratePemCertificate(pkix.Name{CommonName: host}, state.GetSubCACert(), state.GetSubCAKey())
+		pemCertificateString = string(pemCertificate)
+		pemPrivateKeyString = string(pemPrivateKey)
+	}
+
+	return pemCertificateString, pemPrivateKeyString, err
 }
 
 func getResponse(host string) (*discovery.DiscoveryResponse, error) {
@@ -145,8 +172,6 @@ func getResponse(host string) (*discovery.DiscoveryResponse, error) {
 	marshaledResources = make([]*any.Any, 1)
 	marshaledResources[0] = pbst
 
-	log.Println("SDS: returning certificate for " + host)
-
 	result := &discovery.DiscoveryResponse{
 		VersionInfo: "1",
 		Resources:   marshaledResources,
@@ -157,8 +182,18 @@ func getResponse(host string) (*discovery.DiscoveryResponse, error) {
 }
 
 func makeSecret(host string) *tls.Secret {
+	var pemCert, pemKey string
 
-	pemCert, pemKey, _ := generateSDSCertificate(host)
+	s, found := secrets[host]
+	if found {
+		log.Println("SDS: returning cached certificate for " + host)
+		pemCert = s.certificate
+		pemKey = s.key
+	} else {
+		log.Println("SDS: Caching certificate for " + host)
+		pemCert, pemKey, _ = generateSDSCertificate(host)
+		secrets[host] = secret{certificate: pemCert, key: pemKey}
+	}
 
 	certificate := &tls.Secret_TlsCertificate{}
 

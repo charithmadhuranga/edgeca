@@ -36,12 +36,6 @@ var subCACert *x509.Certificate
 var rsasubCAKey *rsa.PrivateKey
 var dersubCACert []byte
 
-func GenerateCertificateUsingCSR(csrByteString string, subCACert *x509.Certificate, casubCAKeyCert *rsa.PrivateKey) (certificate []byte, key []byte, expiry string, err error) {
-
-	subject := GetSubjectFromCSR(csrByteString)
-	return GenerateCertificateUsingX509Subject(subject, subCACert, casubCAKeyCert)
-}
-
 func GenerateCertificateUsingX509Subject(subject pkix.Name, subCACert *x509.Certificate, casubCAKeyCert *rsa.PrivateKey) (certificate []byte, key []byte, expiryString string, err error) {
 	log.Println("Got request for Certificate")
 

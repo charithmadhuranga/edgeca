@@ -165,13 +165,36 @@ edgeca server -p opa/opa.rego
 ```
 
 ### Mode 3: Use TPP
-In this mode, you need to provide a TPP access token when starting up edgecad. 
 
-To use, specify the TPP URL, Zone and Access token. EdgeCA will then get an issuing certificate and policy information from the TPP server. 
+EdgeCA can integrate with a [Venafi](https://www.venafi.com) backend, using [Venafi VCert](https://www.github.com/Venafi/vcert). To use that, do the following:
+
+You should have a TPP URL,  Zone, username and password. First use VCert to generate a TPP token:
+
+```
+git clone https://github.com/Venafi/vcert.git
+cd vcert
+make build
+./bin/linux/vcert getcred -u YOUR_URL --username your_USERNAME --password YOUR_PASSWORD --client-id=edgeca
+
+```
+
+then use the generated token to start up EdgeCA, specifying the TPP URL, Zone and Access token. EdgeCA will then get an issuing certificate and policy information from the TPP server. 
 
 ```
 ./edgeca server --url "..." --zone "..." --token "..." 
 ```
+
+#### Pass-through mode
+
+Instead of having EdgeCA bootstrap itself with an issuing certificate and then issue its own certificates using that issuing certificate, you can have it 
+simply pass all certificate signing requests on to Venafi. To do that, use the `--passthrough` argument:
+
+```
+./edgeca server --url "..." --zone "..." --token "..."  --passthrough
+```
+
+
+
 
 ## Use the EdgeCA CLI
 

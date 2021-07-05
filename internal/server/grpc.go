@@ -56,19 +56,31 @@ func (s *server) RequestPolicy(ctx context.Context, request *grpcimpl.PolicyRequ
 
 }
 
-func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.CertificateRequest) (*grpcimpl.CertificateReply, error) {
+func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.CertificateRequest) (reply *grpcimpl.CertificateReply, err error) {
+	var pemCertificate, pemPrivateKey string
 
-	csr := request.GetCsr()
+	csrByteString := request.GetCsr()
 
-	err := policies.CheckPolicy(csr)
+	err = policies.CheckPolicy(csrByteString)
 	if err != nil {
 		log.Printf("Policy result: %v", err)
 		return nil, err
 	}
+	subject := issuer.GetSubjectFromCSR(csrByteString)
 
-	pemCertificate, pemPrivateKey, _, err := issuer.GenerateCertificateUsingCSR(csr, state.GetSubCACert(), state.GetSubCAKey())
+	if state.UsingPassthrough() {
 
-	return &grpcimpl.CertificateReply{Certificate: /*string(state.GetSubCAPEMCert()) +*/ string(pemCertificate), PrivateKey: string(pemPrivateKey)}, err
+		_, pemCertificate, pemPrivateKey, err = state.GenerateCertificateUsingTPP(subject)
+
+	} else {
+		var bCertificate, bPrivateKey []byte
+		bCertificate, bPrivateKey, _, err = issuer.GenerateCertificateUsingX509Subject(subject, state.GetSubCACert(), state.GetSubCAKey())
+		pemCertificate = string(bCertificate)
+		pemPrivateKey = string(bPrivateKey)
+
+	}
+
+	return &grpcimpl.CertificateReply{Certificate: /*string(state.GetSubCAPEMCert()) +*/ pemCertificate, PrivateKey: pemPrivateKey}, err
 }
 
 //StartGrpcServer starts up the gRPC server

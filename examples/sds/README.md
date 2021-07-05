@@ -69,8 +69,8 @@ openssl s_client --connect localhost:10000
 
 
  ```
- docker logs local-envoy
- docker logs remote-envoy
+ docker logs envoy-local
+ docker logs envoy-remote
  ```
 
 
@@ -115,4 +115,4 @@ curl --cacert ~/.edgeca/certs/CA.pem https://localhost:10000
 
 This curl command will use the CA cert from EdgeCA. It will connect to Envoy, which will in turn use TLS certificates provided to it by EdgeCA.
 
-The expected output is the webpage at https://edgeca.org, which is the one returned by the sample proxy configuration
+The expected output is an JSON file with information about your http request

@@ -19,6 +19,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -45,6 +46,10 @@ type state struct {
 }
 
 var serverState state
+
+func UsingPassthrough() bool {
+	return serverState.passthrough
+}
 
 func GetSubCACert() *x509.Certificate {
 	return serverState.subCACert
@@ -188,22 +193,15 @@ func InitStateUsingTPP(url, zone, token, certDir string) (err error) {
 
 func InitStateUsingTPPPassthrough(url, zone, token, certDir string) (err error) {
 
-	// the mTLS connection to our client still uses a self-signed certificate...
-
 	serverState.tppToken = token
 	serverState.tppURL = url
 	serverState.tppZone = zone
 	serverState.passthrough = true
 
-	serverState.rootCACert, serverState.rootCAPAMCert, serverState.subCACert, serverState.subCAPEMCert, serverState.subCAKey, err =
-		tpp.GenerateTPPRootCACertAndKey(url, zone, token)
-	if err != nil {
-		log.Println("Error: Could not initialize Root CA: ", err)
-		return errors.New("TPP Error:" + err.Error())
-	}
+	log.Println("Initializing EdgeCA in pass-through mode. All requests will be forwarded using TPP")
 
-	log.Println("Root CA Certificate now: ", serverState.rootCACert.Subject.CommonName)
-	log.Println("Sub CA Certificate now: ", serverState.subCACert.Subject.CommonName)
+	// the mTLS connection to our client still uses a self-signed certificate...
+	InitState(certDir)
 
 	defaultValues, restrictions, err := tpp.TPPGetPolicy(url, zone, token)
 
@@ -212,7 +210,10 @@ func InitStateUsingTPPPassthrough(url, zone, token, certDir string) (err error) 
 	log.Println("Reading enforced locked values from TPP policy:", restrictions)
 	policies.ApplyTPPValues(defaultValues, restrictions)
 
-	setupTLSConnection(certDir)
-
 	return nil
+}
+
+func GenerateCertificateUsingTPP(subject pkix.Name) (pemChain string, pemCertificate string, pemPrivateKey string, err error) {
+	return tpp.TPPGenerateCertificateChainAndKey(serverState.tppURL, serverState.tppZone, serverState.tppToken, subject)
+
 }

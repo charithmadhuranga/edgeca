@@ -97,7 +97,7 @@ func init() {
 	serverCmd.Flags().IntVarP(&tlsPort, "port", "", tlsPort, "Port number to use for this server")
 
 	serverCmd.Flags().BoolVarP(&useSDS, "sds", "", false, "Enable Envoy SDS support (development use only)")
-	//	serverCmd.Flags().BoolVarP(&usePassthrough, "passthrough", "", false, "Don't use an issuing certificate or issue certitificates locally. Pass all requests directly to TPP. ")
+	serverCmd.Flags().BoolVarP(&usePassthrough, "passthrough", "", false, "Don't use an issuing certificate or issue certitificates locally. Pass all requests directly to TPP. ")
 
 	serverCmd.Flags().IntVarP(&graphQLport, "graphql", "", 0, "Start a GraphQL server on the specified port")
 

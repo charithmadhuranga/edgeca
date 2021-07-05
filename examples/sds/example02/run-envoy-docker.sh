@@ -29,7 +29,6 @@ sudo docker run --rm -dit --name envoy-local --network envoy-edgeca-poc-net \
 
 
 sudo docker run --rm -dit --name http-echo --network envoy-edgeca-poc-net \
-      -p 8080:8080 -p 8443:8443 \
       mendhak/http-https-echo:18
 
 
