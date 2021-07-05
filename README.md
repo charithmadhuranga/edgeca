@@ -29,12 +29,19 @@ The easiest way to install the application is to use [snaps](./snap)
 snap install edgeca
 ```
 
-or Docker
+Alternatively, use Docker
 
 ```
 docker pull edgesec/edgeca
 ```
 
+or build EdgeCA from source:
+
+```
+git clone https://github.com/edgesec-org/edgeca.git
+cd edgeca
+make
+```
 
 
 
