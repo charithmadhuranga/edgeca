@@ -23,6 +23,8 @@ For more information read these [instructions](docs) on how to install and run E
 
 The easiest way to install the application is to use [snaps](./snap)
 
+[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-white.svg)](https://snapcraft.io/edgeca)
+
 ```
 snap install edgeca
 ```
@@ -35,7 +37,6 @@ docker pull edgesec/edgeca
 
 
 
-[![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-white.svg)](https://snapcraft.io/edgeca)
 
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/edgesec-org/edgeca)](https://goreportcard.com/report/github.com/edgesec-org/edgeca)
