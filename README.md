@@ -1,12 +1,23 @@
 # EdgeCA
-**EdgeCA** is an ephemeral, in-memory CA providing service mesh machine identities.
-It automates the management and issuance of TLS certificates. It can either run with a self-certificated Root CA certificate or use an issuing certificate retrieved using the [Venafi vCert](https://github.com/Venafi/vcert) software.
+**EdgeCA** is an ephemeral, in-memory CA providing service mesh machine identities, automating the management and issuance of TLS certificates.
 
-It solves the many limitations of the embedded service mesh CAs by providing developers a fast, easy, and integrated source of machine identities whilst also providing security teams with the required policy and oversight.  
+It provides developers with a fast, easy, and integrated source of machine identities whilst also providing security teams with the required policy and oversight.  
 
 It also enables ephemeral certificate-based authorization, which reduces the need for permanent access credentials, explicit access revocation or traditional SSH key management. 
 
-EdgeCA is open source, written in Go, and licenced with the Apache 2.0 Licence
+It is easy to install and simple to use.
+
+- `edgeca server` starts up EdgeCA as a server, which supports mTLS gRPC, GraphQL and Envoy SDS as different ways of providing machine identities.
+- `edgeca gencsr` generates a CSR file
+- `edgeca gencert` connects to the EdgeCA Server using mTLS gRPC to sign a CSR request and provide a certificate and private key.
+
+EdgeCA can run in a number of modes. 
+1. It can generate a self-signed Root CA certificate.
+2. You can provide the Root CA certificate to use. 
+3. EdgeCA can connect to the [Venafi vCert](https://github.com/Venafi/vcert) TPP backend to get an issuing certificate, which is then used to generate certificates locally. 
+4. It is also possible to disable completely all local certificate signing and have EdgeCA pass all signing requests directly on to the Venafi back-end.
+
+EdgeCA is a flexible open source solution, written in Go, and licenced with the Apache 2.0 Licence
 
 For more information read these [instructions](docs) on how to install and run EdgeCA. 
 
@@ -15,6 +26,14 @@ The easiest way to install the application is to use [snaps](./snap)
 ```
 snap install edgeca
 ```
+
+or Docker
+
+```
+docker pull edgesec/edgeca
+```
+
+
 
 [![Get it from the Snap Store](https://snapcraft.io/static/images/badges/en/snap-store-white.svg)](https://snapcraft.io/edgeca)
 
