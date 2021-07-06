@@ -19,7 +19,7 @@ EdgeCA can run in a number of modes.
 
 EdgeCA is a flexible open source solution, written in Go, and licenced with the Apache 2.0 Licence
 
-For more information read these [instructions](docs) on how to install and run EdgeCA. 
+For more information see the [EdgeCA Wiki pages](https://github.com/edgesec-org/edgeca/wiki). 
 
 The easiest way to install the application is to use [snaps](./snap)
 
