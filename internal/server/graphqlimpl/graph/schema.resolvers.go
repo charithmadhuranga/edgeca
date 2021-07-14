@@ -5,7 +5,9 @@ package graph
 
 import (
 	"context"
+	"crypto/x509/pkix"
 	"fmt"
+	"log"
 
 	"github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph/generated"
@@ -14,15 +16,54 @@ import (
 )
 
 func (r *mutationResolver) CreateCertificate(ctx context.Context, input model.NewCertificate) (*model.Certificate, error) {
-	certificate, key, expiryStr, err := issuer.GenerateCertificateUsingX509SubjectOptionalValues(input.CommonName,
-		input.Organization, input.OrganizationalUnit, input.Locality, input.Province, input.Country,
-		state.GetSubCACert(), state.GetSubCAKey())
 
-	var cert model.Certificate
-	cert.Certificate = string(certificate)
-	cert.Expiry = expiryStr
-	cert.Key = string(key)
-	return &cert, err
+	var err error
+	var pemCertificate, pemPrivateKey, expiryStr string
+	var subject pkix.Name
+
+	subject.CommonName = input.CommonName
+
+	if input.Organization != nil {
+		subject.Organization = []string{*input.Organization}
+	}
+
+	if input.OrganizationalUnit != nil {
+		subject.OrganizationalUnit = []string{*input.OrganizationalUnit}
+	}
+
+	if input.Locality != nil {
+		subject.Locality = []string{*input.Locality}
+	}
+
+	if input.Province != nil {
+		subject.Province = []string{*input.Province}
+	}
+
+	if input.Country != nil {
+		subject.Country = []string{*input.Country}
+	}
+
+	log.Println("generating ")
+
+	if state.UsingPassthrough() {
+		_, pemCertificate, pemPrivateKey, err = state.GenerateCertificateUsingTPP(subject)
+		if err == nil {
+			expiryStr, err = issuer.GetExpiryOfPEMCertificate([]byte(pemCertificate))
+		}
+	} else {
+
+		var bCertificate, bPrivateKey []byte
+
+		bCertificate, bPrivateKey, expiryStr, err = issuer.GenerateCertificateUsingX509Subject(subject, state.GetSubCACert(), state.GetSubCAKey())
+		pemCertificate = string(bCertificate)
+		pemPrivateKey = string(bPrivateKey)
+	}
+
+	var result model.Certificate
+	result.Certificate = pemCertificate
+	result.Expiry = expiryStr
+	result.Key = pemPrivateKey
+	return &result, err
 }
 
 func (r *queryResolver) Certificate(ctx context.Context) ([]*model.Certificate, error) {
