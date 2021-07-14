@@ -21,7 +21,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log"
+	"time"
 )
 
 func PemToRSAPrivateKey(pemKey []byte) (rsaKey *rsa.PrivateKey, err error) {
@@ -30,6 +32,14 @@ func PemToRSAPrivateKey(pemKey []byte) (rsaKey *rsa.PrivateKey, err error) {
 	if err == nil {
 		rsaKey = key.(*rsa.PrivateKey)
 	}
+	return
+}
+
+func GetExpiryOfPEMCertificate(pemCert []byte) (expiry string, err error) {
+
+	cert, err := PemToCert(pemCert)
+
+	expiry = fmt.Sprintf(cert.NotAfter.Format(time.RFC3339))
 	return
 }
 
