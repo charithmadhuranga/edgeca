@@ -7,12 +7,12 @@ import (
 	"context"
 	"crypto/x509/pkix"
 	"fmt"
-	"log"
 
 	"github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph/generated"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph/model"
 	"github.com/edgesec-org/edgeca/internal/state"
+	"github.com/prometheus/common/log"
 )
 
 func (r *mutationResolver) CreateCertificate(ctx context.Context, input model.NewCertificate) (*model.Certificate, error) {
@@ -43,7 +43,7 @@ func (r *mutationResolver) CreateCertificate(ctx context.Context, input model.Ne
 		subject.Country = []string{*input.Country}
 	}
 
-	log.Println("generating ")
+	log.Debugln("GraphQL request: certificate for " + subject.CommonName + " from issuer: " + state.GetStateDescription())
 
 	if state.UsingPassthrough() {
 		_, pemCertificate, pemPrivateKey, err = state.GenerateCertificateUsingTPP(subject)

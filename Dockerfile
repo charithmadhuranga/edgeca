@@ -21,11 +21,12 @@ WORKDIR /tmp/edgeca
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
+ARG version
 
 COPY . .
 
-
-RUN go build -o bin/edgeca ./cmd/edgeca/
+RUN echo "-X github.com/edgesec-org/edgeca.Version=$version"
+RUN go build -ldflags "-X github.com/edgesec-org/edgeca.Version=$version" -o bin/edgeca ./cmd/edgeca/
 
 # Start fresh from a smaller image
 FROM alpine:3.9 
