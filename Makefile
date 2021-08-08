@@ -9,7 +9,7 @@ all:
 	go build $(GOFLAGS) -o bin/edgeca ./cmd/edgeca 
 
 docker:
-	docker build -t edgesec/edgeca .
+	docker build --build-arg version="$(GIT_VERSION)" -t edgesec/edgeca .
 	docker push edgesec/edgeca
 
 snapcraft:
