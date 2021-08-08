@@ -18,8 +18,9 @@ package sds
 import (
 	"context"
 	"crypto/x509/pkix"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	tls "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
@@ -92,7 +93,7 @@ func (s *server) StreamSecrets(stream secretservice.SecretDiscoveryService_Strea
 			hostname := req.GetResourceNames()[0]
 			resp, _ := getResponse(hostname)
 			s.streamCount++
-			//		log.Printf("SDS: Processing request for certificates for %v", req.GetResourceNames())
+			//		log.Debugf("SDS: Processing request for certificates for %v", req.GetResourceNames())
 			stream.Send(resp)
 
 		}
@@ -104,13 +105,13 @@ func (s *server) StreamSecrets(stream secretservice.SecretDiscoveryService_Strea
 
 func (s *server) FetchSecrets(ctx context.Context, req *discovery.DiscoveryRequest) (*discovery.DiscoveryResponse, error) {
 
-	log.Println("SDS: FetchSecrets")
+	log.Debugln("SDS: FetchSecrets")
 
 	return nil, nil
 }
 
 func (s *server) DeltaSecrets(stream secretservice.SecretDiscoveryService_DeltaSecretsServer) error {
-	log.Println("SDS: DeltaSecrets")
+	log.Debugln("SDS: DeltaSecrets")
 
 	return nil
 }
@@ -143,12 +144,12 @@ func generateSDSCertificate(host string) (pemCert, pemKey string, err error) {
 	var pemCertificateString, pemPrivateKeyString string
 
 	if state.UsingPassthrough() {
-		log.Println("SDS: Using TPP to sign certificate for " + host)
+		log.Debugln("SDS: Using TPP to sign certificate for " + host)
 
 		_, pemCertificateString, pemPrivateKeyString, err = state.GenerateCertificateUsingTPP(pkix.Name{CommonName: host})
 
 	} else {
-		log.Println("SDS: Using EdgeCA issuing certificate to sign certificate for " + host)
+		log.Debugln("SDS: Using EdgeCA issuing certificate to sign certificate for " + host)
 
 		var pemCertificate, pemPrivateKey []byte
 		pemCertificate, pemPrivateKey, _, err = certs.GeneratePemCertificate(pkix.Name{CommonName: host}, state.GetSubCACert(), state.GetSubCAKey())
@@ -186,11 +187,11 @@ func makeSecret(host string) *tls.Secret {
 
 	s, found := secrets[host]
 	if found {
-		log.Println("SDS: returning cached certificate for " + host)
+		log.Debugln("SDS: returning cached certificate for " + host)
 		pemCert = s.certificate
 		pemKey = s.key
 	} else {
-		log.Println("SDS: Caching certificate for " + host)
+		log.Debugln("SDS: Caching certificate for " + host)
 		pemCert, pemKey, _ = generateSDSCertificate(host)
 		secrets[host] = secret{certificate: pemCert, key: pemKey}
 	}

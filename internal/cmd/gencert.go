@@ -20,10 +20,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"strconv"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/edgesec-org/edgeca"
 	"github.com/edgesec-org/edgeca/internal/config"
 	certs "github.com/edgesec-org/edgeca/internal/issuer"
 	internalgrpc "github.com/edgesec-org/edgeca/internal/server/grpcimpl"
@@ -51,62 +53,27 @@ func init() {
 	gencsr.Flags().StringVarP(&certFileName, "cert", "o", "", "Output Certificate file")
 	gencsr.Flags().StringVarP(&certkeyFileName, "key", "k", "", "Output Private Key file")
 	certtlsCertDir = config.GetDefaultTLSCertDir()
-	gencsr.Flags().StringVarP(&certtlsCertDir, "tls-certs", "d", certtlsCertDir, "Location of certs for gRPC authentication")
+	gencsr.Flags().StringVarP(&certtlsCertDir, "auth-dir", "", certtlsCertDir, "Location of certs for gRPC authentication")
 	tlsHostName = config.GetDefaultTLSHost()
 	gencsr.Flags().StringVarP(&tlsHostName, "server", "", tlsHostName, "EdgeCA gRPC server name")
 	certTLSPort = config.GetDefaultTLSPort()
 	gencsr.Flags().IntVarP(&certTLSPort, "port", "", certTLSPort, "TLS port of gRPC server")
 
 	gencsr.MarkFlagRequired("csr")
+	gencsr.Flags().BoolVarP(&useDebugLogging, "debug", "d", false, "Enable Debug logging")
 
-}
-
-func getcsr() (csr string) {
-	content, err := ioutil.ReadFile(csrFile)
-	if err != nil {
-		log.Fatalf("could not read file %s: %v", csrFile, err)
-	}
-
-	// Convert []byte to string and print to screen
-	csr = string(content)
-	return
-}
-
-func grpcConnect(tlsCertDir, host string, port int) (*grpc.ClientConn, internalgrpc.CAClient) {
-
-	log.Println("Loading TLS certificates from " + tlsCertDir)
-
-	certPool, err := certs.LoadCAServerCert(tlsCertDir + "/CA.pem")
-	if err != nil {
-		log.Fatalf("Could not load CA certificate for TLS connection: %s", err)
-	}
-
-	clientCert, err := tls.LoadX509KeyPair(tlsCertDir+"/edgeca-client-cert.pem", tlsCertDir+"/edgeca-client-key.pem")
-	if err != nil {
-		log.Fatalf("Could not load TLS client certificate and key: %s", err)
-	}
-
-	config := &tls.Config{
-		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      certPool,
-	}
-
-	creds := credentials.NewTLS(config)
-
-	//	log.Println("Connecting to GRPC server,", creds)
-	conn, err := grpc.Dial(host+":"+strconv.Itoa(port), grpc.WithTransportCredentials(creds)) //, grpc.WithBlock()
-
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	c := internalgrpc.NewCAClient(conn)
-
-	return conn, c
 }
 
 func grpcGenerateCertificate() {
+
+	if useDebugLogging {
+		log.SetLevel(log.DebugLevel)
+		log.Debugln("EdgeCA v" + edgeca.Version + " debug logging enabled")
+
+	}
+
 	csr := getcsr()
-	log.Println("Connecting to edgeca server at " + tlsHostName + " to sign certificate")
+	log.Debugln("Connecting to edgeca server at " + tlsHostName + " to sign certificate")
 
 	conn, c := grpcConnect(certtlsCertDir, tlsHostName, certTLSPort)
 	defer conn.Close()
@@ -128,7 +95,7 @@ func grpcGenerateCertificate() {
 		if err != nil {
 			log.Fatalf("Error writing Certificate to %s: %v", certFileName, err)
 		} else {
-			log.Printf("Wrote Certificate to %s", certFileName)
+			log.Debugln("Wrote Certificate to %s", certFileName)
 		}
 
 	} else {
@@ -140,11 +107,54 @@ func grpcGenerateCertificate() {
 		if err != nil {
 			log.Fatalf("Error writing key to %s: %v", certkeyFileName, err)
 		} else {
-			log.Printf("Wrote key to %s", certkeyFileName)
+			log.Debugln("Wrote key to %s", certkeyFileName)
 		}
 
 	} else {
 		fmt.Println(key)
 	}
 
+}
+
+func getcsr() (csr string) {
+	content, err := ioutil.ReadFile(csrFile)
+	if err != nil {
+		log.Fatalf("could not read file %s: %v", csrFile, err)
+	}
+
+	// Convert []byte to string and print to screen
+	csr = string(content)
+	return
+}
+
+func grpcConnect(tlsCertDir, host string, port int) (*grpc.ClientConn, internalgrpc.CAClient) {
+
+	log.Debugln("Loading TLS certificates from " + tlsCertDir)
+
+	certPool, err := certs.LoadCAServerCert(tlsCertDir + "/CA.pem")
+	if err != nil {
+		log.Fatalf("Could not load CA certificate for TLS connection: %s", err)
+	}
+
+	clientCert, err := tls.LoadX509KeyPair(tlsCertDir+"/edgeca-client-cert.pem", tlsCertDir+"/edgeca-client-key.pem")
+	if err != nil {
+		log.Fatalf("Could not load TLS client certificate and key: %s", err)
+	}
+
+	config := &tls.Config{
+		Certificates: []tls.Certificate{clientCert},
+		RootCAs:      certPool,
+	}
+
+	creds := credentials.NewTLS(config)
+
+	log.Debugf("Connecting to GRPC server " + host + ":" + strconv.Itoa(port))
+	conn, err := grpc.Dial(host+":"+strconv.Itoa(port), grpc.WithTransportCredentials(creds)) //, grpc.WithBlock()
+
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	c := internalgrpc.NewCAClient(conn)
+
+	return conn, c
 }

@@ -17,7 +17,8 @@ package cmd
 
 import (
 	"fmt"
-	"log"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/edgesec-org/edgeca"
 	"github.com/edgesec-org/edgeca/internal/config"
@@ -30,6 +31,7 @@ import (
 var policy, defaultConfig, tppToken, tppURL, tppZone, caCert, caKey, serverTlsCertDir string
 var tlsPort, graphQLport int
 var useSDS, usePassthrough bool
+var useDebugLogging bool
 
 func init() {
 
@@ -91,7 +93,7 @@ func init() {
 	serverCmd.Flags().StringVarP(&tppZone, "zone", "z", "", "TPP Zone")
 
 	serverTlsCertDir = config.GetDefaultTLSCertDir()
-	serverCmd.Flags().StringVarP(&serverTlsCertDir, "tls-certs", "d", serverTlsCertDir, "Directory to write gRPC TLS Client certificates to")
+	serverCmd.Flags().StringVarP(&serverTlsCertDir, "auth-dir", "", serverTlsCertDir, "Directory to write gRPC TLS Client certificates to")
 
 	tlsPort = config.GetDefaultTLSPort()
 	serverCmd.Flags().IntVarP(&tlsPort, "port", "", tlsPort, "Port number to use for this server")
@@ -101,12 +103,18 @@ func init() {
 
 	serverCmd.Flags().IntVarP(&graphQLport, "graphql", "", 0, "Start a GraphQL server on the specified port")
 
+	serverCmd.Flags().BoolVarP(&useDebugLogging, "debug", "d", false, "Enable Debug logging")
+
 }
 
 // Execute the commands
 func startEdgeCAServer() {
 	fmt.Println("EdgeCA server " + edgeca.Version + " starting up")
-	log.SetPrefix("edgeCA: ")
+	if useDebugLogging {
+		log.SetLevel(log.DebugLevel)
+		log.Debugln("Debug logging enabled")
+
+	}
 
 	if tppToken != "" || tppURL != "" || tppZone != "" || usePassthrough {
 		if usePassthrough {
@@ -136,7 +144,7 @@ func mode1SelfCert() {
 		policies.LoadPolicy(policy)
 	}
 
-	log.Println("Mode 1 (Using self-signed issuing certificate and key)")
+	log.Infoln("Mode 1 (Using self-signed issuing certificate and key)")
 	state.InitState(serverTlsCertDir)
 
 }
@@ -146,7 +154,7 @@ func mode2BYOCert() {
 		policies.LoadPolicy(policy)
 	}
 
-	log.Println("Mode 2 (Using provided issuing certificate and key).")
+	log.Infoln("Mode 2 (Using provided issuing certificate and key).")
 	err := state.InitStateUsingCerts(caCert, caKey, serverTlsCertDir)
 
 	if err != nil {
@@ -163,17 +171,17 @@ func mode3UseTPP() {
 	}
 
 	if policy != "" || defaultConfig != "" {
-		log.Println("Mode 3 (Using TPP). Warning: If TPP-Token is specified, policy file settings are ignored.")
+		log.Warnln("Mode 3 (Using TPP). Warning: If TPP-Token is specified, policy file settings are ignored.")
 	}
 
-	log.Println("Mode 3 (Using TPP). Connecting using specified TPP token, URL and Zone")
+	log.Infoln("Mode 3 (Using TPP). Connecting using specified TPP token, URL and Zone")
 
 	err := state.InitStateUsingTPP(tppURL, tppZone, tppToken, serverTlsCertDir)
 
 	if err != nil {
 		log.Fatalf("TPPLogin error: %v", err.Error())
 	} else {
-		log.Printf("TPPLogin OK")
+		log.Infoln("TPPLogin OK")
 	}
 }
 
@@ -186,15 +194,15 @@ func mode4UsePassthrough() {
 	}
 
 	if policy != "" || defaultConfig != "" {
-		log.Println("Mode 4 (Using TPP/Passthrough). Warning: If TPP-Token is specified, policy file settings are ignored.")
+		log.Warnln("Mode 4 (Using TPP/Passthrough). Warning: If TPP-Token is specified, policy file settings are ignored.")
 	}
 
-	log.Println("Mode 4 (Using TPP/Passthrough). Connecting using specified TPP token, URL and Zone")
+	log.Infoln("Mode 4 (Using TPP/Passthrough). Connecting using specified TPP token, URL and Zone")
 
 	err := state.InitStateUsingTPPPassthrough(tppURL, tppZone, tppToken, serverTlsCertDir)
 	if err != nil {
 		log.Fatalf("TPPLogin error: %v", err.Error())
 	} else {
-		log.Printf("TPPLogin OK")
+		log.Infoln("TPPLogin OK")
 	}
 }

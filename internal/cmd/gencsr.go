@@ -19,9 +19,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
+	"github.com/edgesec-org/edgeca"
 	"github.com/edgesec-org/edgeca/internal/config"
 	certs "github.com/edgesec-org/edgeca/internal/issuer"
 	internalgrpc "github.com/edgesec-org/edgeca/internal/server/grpcimpl"
@@ -60,18 +62,25 @@ func init() {
 	gencsr.Flags().StringVarP(&csrFileName, "csr", "", "", "Output file for CSR")
 	gencsr.Flags().BoolVarP(&refresh, "refresh", "r", false, "Refresh the list of default values from the current policy")
 	csrTlsCertDir = config.GetDefaultTLSCertDir()
-	gencsr.Flags().StringVarP(&csrTlsCertDir, "tls-certs", "d", csrTlsCertDir, "Location of certs for gRPC authentication")
+	gencsr.Flags().StringVarP(&csrTlsCertDir, "auth-dir", "", csrTlsCertDir, "Location of certs for gRPC authentication")
 	csrHostName = config.GetDefaultTLSHost()
 	gencsr.Flags().StringVarP(&csrHostName, "server", "s", csrHostName, "EdgeCA gRPC server name")
 	csrTLSPort = config.GetDefaultTLSPort()
 	gencsr.Flags().IntVarP(&csrTLSPort, "port", "", csrTLSPort, "TLS port of gRPC server")
+	gencsr.Flags().BoolVarP(&useDebugLogging, "debug", "d", false, "Enable Debug logging")
 }
 
 func generateCSR() {
 
+	if useDebugLogging {
+		log.SetLevel(log.DebugLevel)
+		log.Debugln("EdgeCA v" + edgeca.Version + " debug logging enabled")
+
+	}
+
 	// only use gRPC if --refresh is set
 	if refresh {
-		log.Println("Connecting to edgeca server at " + csrHostName + " to refresh policy information")
+		log.Debugln("Connecting to edgeca server at " + csrHostName + " to refresh policy information")
 
 		conn, c := grpcConnect(csrTlsCertDir, csrHostName, csrTLSPort)
 		defer conn.Close()
@@ -164,6 +173,6 @@ func generatePemCSR() (csrBytes []byte, privatekeyBytes []byte, err error) {
 
 	csrBytes = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: derBytes})
 	privatekeyBytes = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateRSAKey)})
-	log.Println("Generated CSR for [", subj, "]")
+	log.Debugln("Generated CSR for [", subj, "]")
 	return csrBytes, privatekeyBytes, err
 }

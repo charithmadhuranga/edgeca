@@ -16,9 +16,10 @@
 package server
 
 import (
-	"log"
 	"net/http"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -34,6 +35,6 @@ func StartGraphqlServer(port int) {
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)
 
-	log.Printf("connect to http://localhost:%s/ for GraphQL playground", sPort)
+	log.Debugf("connect to http://localhost:%s/ for GraphQL playground", sPort)
 	log.Fatal(http.ListenAndServe(":"+sPort, nil))
 }

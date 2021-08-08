@@ -22,8 +22,9 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func PemToRSAPrivateKey(pemKey []byte) (rsaKey *rsa.PrivateKey, err error) {
@@ -55,7 +56,7 @@ func PemToCert(pemCert []byte) (cert *x509.Certificate, err error) {
 
 	certificate, err := x509.ParseCertificate(derBytes)
 	if err != nil {
-		log.Println("ParseCertificate failed:", err)
+		log.Errorf("ParseCertificate failed %v:", err)
 	}
 	return certificate, err
 
