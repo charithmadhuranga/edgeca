@@ -20,8 +20,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/Venafi/vcert/v4"
 	"github.com/Venafi/vcert/v4/pkg/certificate"
@@ -42,7 +43,7 @@ func connect(url, zone, token string) (endpoint.Connector, error) {
 	if err != nil {
 
 		errorString := "Error:could not connect to endpoint:" + err.Error()
-		log.Println(errorString)
+		log.Debugln(errorString)
 	}
 
 	return c, err
@@ -79,7 +80,7 @@ type PolicyRegex struct {
 }
 
 func TPPGetPolicy(url, zone, token string) (defaultConfiguration *DefaultZoneConfiguration, restrictions *PolicyRegex, err error) {
-	log.Println("TPP: get policy  ")
+	log.Debugln("TPP: get policy  ")
 	var defaults DefaultZoneConfiguration
 	var rest PolicyRegex
 
@@ -95,7 +96,7 @@ func TPPGetPolicy(url, zone, token string) (defaultConfiguration *DefaultZoneCon
 		return nil, nil, err
 	}
 
-	log.Println("TPP: get default configuration  ")
+	log.Debugln("TPP: get default configuration  ")
 
 	defaults.Organization = zoneConfig.Organization
 	defaults.OrganizationalUnit = zoneConfig.OrganizationalUnit
@@ -103,7 +104,7 @@ func TPPGetPolicy(url, zone, token string) (defaultConfiguration *DefaultZoneCon
 	defaults.Province = zoneConfig.Province
 	defaults.Locality = zoneConfig.Locality
 
-	log.Println("TPP: ReadPolicyConfiguration  ")
+	log.Debugln("TPP: ReadPolicyConfiguration  ")
 	policy, err := c.ReadPolicyConfiguration()
 	if err != nil {
 		log.Fatalln("TPP Error:", err.Error())
@@ -120,7 +121,7 @@ func TPPGetPolicy(url, zone, token string) (defaultConfiguration *DefaultZoneCon
 
 // TPPGenerateCertificateChainAndKey generates a certificate using TPP
 func TPPGenerateCertificateChainAndKey(url, zone, token string, subject pkix.Name) (pemChain string, pemCertificate string, pemPrivateKey string, err error) {
-	log.Println("TPP: sending request for ", subject.CommonName)
+	log.Debugln("TPP: sending request for ", subject.CommonName)
 
 	c, err := connect(url, zone, token)
 
@@ -140,26 +141,26 @@ func TPPGenerateCertificateChainAndKey(url, zone, token string, subject pkix.Nam
 
 	zoneConfig, err := c.ReadZoneConfiguration()
 	if err != nil {
-		log.Println("TPP Error:", err.Error())
+		log.Debugln("TPP Error:", err.Error())
 		return "", "", "", err
 	}
 
-	log.Printf("Successfully read zone configuration for %s\n", zone)
+	log.Debugf("Successfully read zone configuration for %s\n", zone)
 
 	err = c.GenerateRequest(zoneConfig, enrollReq)
 	if err != nil {
-		log.Println("Error:", err.Error())
+		log.Debugln("Error:", err.Error())
 		return "", "", "", err
 	}
 
-	log.Printf("Successfully created request for %s\n", subject.CommonName)
+	log.Debugf("Successfully created request for %s\n", subject.CommonName)
 
 	//
 	// 1.3. Submit certificate request, get request ID as a response
 	//
 	requestID, err := c.RequestCertificate(enrollReq)
 	if err != nil {
-		log.Println("Error:", err.Error())
+		log.Debugln("Error:", err.Error())
 		return "", "", "", err
 	}
 
@@ -175,7 +176,7 @@ func TPPGenerateCertificateChainAndKey(url, zone, token string, subject pkix.Nam
 
 	pcc, err := c.RetrieveCertificate(pickupReq)
 	if err != nil {
-		log.Println("Retrieving " + pickupReq.PickupID + " : " + err.Error())
+		log.Debugln("Retrieving " + pickupReq.PickupID + " : " + err.Error())
 		return "", "", "", err
 	}
 
@@ -184,7 +185,7 @@ func TPPGenerateCertificateChainAndKey(url, zone, token string, subject pkix.Nam
 	//
 	err = pcc.AddPrivateKey(enrollReq.PrivateKey, []byte(enrollReq.KeyPassword))
 	if err != nil {
-		log.Println("Retrieving " + pickupReq.PickupID + " : " + err.Error())
+		log.Debugln("Retrieving " + pickupReq.PickupID + " : " + err.Error())
 		return "", "", "", err
 	}
 
@@ -208,7 +209,7 @@ func TPPGenerateCertificateChainAndKey(url, zone, token string, subject pkix.Nam
 
 // GenerateTPPRootCACertAndKey generates CA issuing cert and key using TPP
 func GenerateTPPRootCACertAndKey(url, zone, token string) (rootCert *x509.Certificate, pemRootCACert []byte, subCert *x509.Certificate, pemSubCACert []byte, rsaRootKey *rsa.PrivateKey, err error) {
-	log.Printf("Request Root CA Certificate using TPP")
+	log.Debugf("Request Root CA Certificate using TPP")
 	subject := pkix.Name{
 		CommonName: "EdgeCASubCA",
 	}
@@ -217,7 +218,7 @@ func GenerateTPPRootCACertAndKey(url, zone, token string) (rootCert *x509.Certif
 	chain, cert, pemKey, err := TPPGenerateCertificateChainAndKey(url, zone, token, subject)
 
 	if err != nil {
-		log.Println(string("Could not generate issuing cert:"), err.Error())
+		log.Debugln(string("Could not generate issuing cert:"), err.Error())
 	} else {
 		rsaRootKey, err = certs.PemToRSAPrivateKey([]byte(pemKey))
 		pemRootCACert = []byte(chain)

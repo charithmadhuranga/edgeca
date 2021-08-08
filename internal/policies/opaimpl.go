@@ -19,8 +19,9 @@ import (
 	"context"
 	"errors"
 	"io/ioutil"
-	"log"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/edgesec-org/edgeca/internal/server/tpp"
 	"github.com/open-policy-agent/opa/rego"
@@ -78,7 +79,7 @@ func createDefaultPolicyFile(commonName, organization, organizationalUnit, provi
 		"true\n" +
 		"}"
 
-	log.Println("Setting Policy to \n---\n", tppPolicy, "\n---\n")
+	log.Debugln("OPA: Setting Policy to \n---\n", tppPolicy, "\n---\n")
 	policy = tppPolicy
 
 }
@@ -100,11 +101,10 @@ func LoadPolicy(policyFilename string) {
 func CheckPolicy(csr string) error {
 
 	if policy == "" {
-		log.Println("No policy file was specified")
 		return nil
 	}
 
-	log.Println("Applying policy from ", filename)
+	log.Debugln("OPA: Applying policy from ", filename)
 
 	// create the JSON object with the CSR
 	ctx := context.TODO()

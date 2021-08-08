@@ -15,4 +15,4 @@
 
 package edgeca
 
-var Version string = "0.4.6"
+var Version string = "to be replaced in makefile"

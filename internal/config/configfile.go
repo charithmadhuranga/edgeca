@@ -17,8 +17,9 @@ package config
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"gopkg.in/yaml.v2"
 )
@@ -106,7 +107,7 @@ func SetCSRConfiguration(o string, ou string, c string, p string, l string) erro
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	log.Println("Updated configuration file " + configFile)
+	log.Debugln("Updated configuration file " + configFile)
 	return nil
 }
 

@@ -19,9 +19,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"log"
 	"net"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/server/grpcimpl"
@@ -39,12 +40,12 @@ type server struct {
 }
 
 func (s *server) RequestPolicy(ctx context.Context, request *grpcimpl.PolicyRequest) (*grpcimpl.PolicyReply, error) {
-	log.Println("Got request for Policy Information")
+	log.Debugln("Got request for Policy Information")
 
 	policyStr := string(policies.GetCurrentPolicy())
 	defaultO, defaultOU, defaultC, defaultST, defaultL := policies.GetDefaultValues()
 
-	log.Println("DefaultOrganization:", defaultO)
+	log.Debugln("DefaultOrganization:", defaultO)
 	return &grpcimpl.PolicyReply{
 		Policy:                    policyStr,
 		DefaultOrganization:       defaultO,
@@ -63,7 +64,7 @@ func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.Cert
 
 	err = policies.CheckPolicy(csrByteString)
 	if err != nil {
-		log.Printf("Policy result: %v", err)
+		log.Debugf("Policy result: %v", err)
 		return nil, err
 	}
 	subject := issuer.GetSubjectFromCSR(csrByteString)
@@ -74,6 +75,9 @@ func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.Cert
 
 	} else {
 		var bCertificate, bPrivateKey []byte
+
+		log.Debugln("gRPC request: certificate for " + subject.CommonName + " from issuer: " + state.GetStateDescription())
+
 		bCertificate, bPrivateKey, _, err = issuer.GenerateCertificateUsingX509Subject(subject, state.GetSubCACert(), state.GetSubCAKey())
 		pemCertificate = string(bCertificate)
 		pemPrivateKey = string(bPrivateKey)
@@ -115,11 +119,11 @@ func StartGrpcServer(port int, useSDS bool) {
 	)
 
 	if useSDS {
-		log.Println("Enabling SDS support")
+		log.Infof("Enabling SDS support")
 		sds.InjectSDSServer(s)
 	}
 
-	log.Println("Starting gRPC CA server on port", port)
+	log.Infof("Starting gRPC CA server on port %d", port)
 
 	grpcimpl.RegisterCAServer(s, &server{})
 	if err := s.Serve(lis); err != nil {

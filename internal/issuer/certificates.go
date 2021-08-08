@@ -22,9 +22,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var serialNumber big.Int
@@ -37,12 +38,11 @@ var rsasubCAKey *rsa.PrivateKey
 var dersubCACert []byte
 
 func GenerateCertificateUsingX509Subject(subject pkix.Name, subCACert *x509.Certificate, casubCAKeyCert *rsa.PrivateKey) (certificate []byte, key []byte, expiryString string, err error) {
-	log.Println("Got request for Certificate")
 
 	//	err = policies.CheckPolicy(csrByteString)
 
 	//	if err != nil {
-	//		log.Printf("Policy result: %v", err)
+	//		log.Debugf("Policy result: %v", err)
 	//		return nil, nil, err
 	//	}
 
@@ -54,8 +54,6 @@ func GenerateCertificateUsingX509SubjectOptionalValues(commonName string, o, ou,
 	subCACert *x509.Certificate, casubCAKeyCert *rsa.PrivateKey) (certificate []byte, key []byte, expiryString string, err error) {
 
 	var organization, organizationalUnit, locality, province, country string
-
-	log.Println("Requesting certificate for " + commonName)
 
 	if o != nil {
 		organization = *o
@@ -73,13 +71,6 @@ func GenerateCertificateUsingX509SubjectOptionalValues(commonName string, o, ou,
 		country = *c
 	}
 
-	return GenerateCertificateUsingX509SubjectValues(commonName, organization, organizationalUnit, locality, province, country, subCACert, casubCAKeyCert)
-}
-
-func GenerateCertificateUsingX509SubjectValues(commonName, organization, organizationalUnit, locality, province, country string,
-	subCACert *x509.Certificate, casubCAKeyCert *rsa.PrivateKey) (certificate []byte, key []byte, expiryString string, err error) {
-	log.Println("Requesting certificate for " + commonName)
-
 	subject := pkix.Name{
 		Organization:       []string{organization},
 		OrganizationalUnit: []string{organizationalUnit},
@@ -91,7 +82,7 @@ func GenerateCertificateUsingX509SubjectValues(commonName, organization, organiz
 	//	err = policies.CheckPolicy(csrByteString)
 
 	//	if err != nil {
-	//		log.Printf("Policy result: %v", err)
+	//		log.Debugf("Policy result: %v", err)
 	//		return nil, nil, err
 	//	}
 
@@ -135,8 +126,6 @@ func GetSubjectFromCSR(csr string) (subject pkix.Name) {
 	province := certrequest.Subject.Province
 	country := certrequest.Subject.Country
 
-	log.Printf("Signing certificate (CN=%v)", commonName)
-
 	subject = pkix.Name{
 		Organization:       organization,
 		OrganizationalUnit: organizationalUnit,
@@ -150,7 +139,7 @@ func GetSubjectFromCSR(csr string) (subject pkix.Name) {
 
 //GenerateSelfSignedSubCACertAndKey generates the sub CA certificate
 func GenerateSelfSignedSubCACertAndKey(parentCert *x509.Certificate, parentKey *rsa.PrivateKey) (certificate *x509.Certificate, pemSubCert []byte, rsasubCAKey *rsa.PrivateKey, err error) {
-	log.Printf("Generating self signed Sub CA Certificate")
+	log.Debugf("Generating self signed Sub CA Certificate")
 
 	rsasubCAKey, err = GenerateRSAKey()
 	if err != nil {
@@ -199,7 +188,7 @@ func GeneratePemCertificate(subject pkix.Name, parentCert *x509.Certificate, par
 
 //GenerateSelfSignedRootCACertAndKey generates the root certificate
 func GenerateSelfSignedRootCACertAndKey() (certificate *x509.Certificate, pemCACert []byte, rsaRootKey *rsa.PrivateKey, err error) {
-	log.Printf("Generating self signed Root CA Certificate")
+	log.Debugf("Generating self signed Root CA Certificate")
 
 	rsaRootKey, err = GenerateRSAKey()
 	if err != nil {
@@ -214,13 +203,13 @@ func GenerateSelfSignedRootCACertAndKey() (certificate *x509.Certificate, pemCAC
 
 	derRsaRootCert, err = signCertificateAndDEREncode(unsignedCertificate, unsignedCertificate, rsaRootKey, rsaRootKey)
 	if err != nil {
-		log.Println("signCertificateAndDEREncode failed:", err)
+		log.Debugln("signCertificateAndDEREncode failed:", err)
 		return nil, nil, nil, err
 	}
 
 	certificate, err = x509.ParseCertificate(derRsaRootCert)
 	if err != nil {
-		log.Println("ParseCertificate failed:", err)
+		log.Debugln("ParseCertificate failed:", err)
 	}
 
 	pemCACert = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derRsaRootCert})

@@ -22,13 +22,19 @@ import (
 	"crypto/x509/pkix"
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	certs "github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/policies"
 	"github.com/edgesec-org/edgeca/internal/server/tpp"
 )
+
+const mode1UseSelfSigned = 1
+const mode2UseBYOCert = 2
+const mode3UseTPP = 3
+const mode4TPPPassthrough = 4
 
 type state struct {
 	rootCACert     *x509.Certificate
@@ -43,6 +49,7 @@ type state struct {
 	organization   string
 	tlsCertificate *tls.Certificate
 	passthrough    bool
+	mode           int
 }
 
 var serverState state
@@ -71,9 +78,25 @@ func GetServerTLSCert() *tls.Certificate {
 	return serverState.tlsCertificate
 }
 
+func GetStateDescription() (result string) {
+	switch serverState.mode {
+
+	case mode1UseSelfSigned:
+		result = "Local Self Signed CA (" + serverState.subCACert.Subject.CommonName + "/" + serverState.subCACert.Issuer.CommonName + ")"
+	case mode2UseBYOCert:
+		result = "User Provided Root CA certificate (" + serverState.subCACert.Subject.CommonName + "/" + serverState.subCACert.Issuer.CommonName + ")"
+	case mode3UseTPP:
+		result = "Venafi TPP (" + serverState.subCACert.Subject.CommonName + "/" + serverState.subCACert.Issuer.CommonName + ")"
+	case mode4TPPPassthrough:
+		result = "Venafi TPP passthrough"
+	}
+	return
+}
+
 // InitState initializes the in-memory state
 func InitState(tlsCertDir string) {
 	var err error
+	serverState.mode = mode1UseSelfSigned
 
 	serverState.organization = "EdgeCA"
 	serverState.rootCACert, serverState.rootCAPAMCert, serverState.rootCAKey, err = certs.GenerateSelfSignedRootCACertAndKey()
@@ -90,6 +113,8 @@ func InitState(tlsCertDir string) {
 }
 
 func InitStateUsingCerts(caCert, caKey, tlsCertDir string) error {
+
+	serverState.mode = mode2UseBYOCert
 
 	pemRootCACert, err := ioutil.ReadFile(caCert)
 	if err != nil {
@@ -146,7 +171,7 @@ func setupTLSConnection(certDir string) {
 	}
 
 	filename := certDir + "/CA.pem"
-	log.Println("Writing Root CA Certificate to ", filename)
+	log.Debugln("Writing Root CA Certificate to ", filename)
 	cert := GetRootCACert()
 	subCA := GetSubCAPEMCert()
 	certs := make([]byte, len(cert)+len(subCA))
@@ -163,7 +188,7 @@ func setupTLSConnection(certDir string) {
 }
 
 func InitStateUsingTPP(url, zone, token, certDir string) (err error) {
-
+	serverState.mode = mode3UseTPP
 	serverState.tppToken = token
 	serverState.tppURL = url
 	serverState.tppZone = zone
@@ -172,18 +197,18 @@ func InitStateUsingTPP(url, zone, token, certDir string) (err error) {
 	serverState.rootCACert, serverState.rootCAPAMCert, serverState.subCACert, serverState.subCAPEMCert, serverState.subCAKey, err =
 		tpp.GenerateTPPRootCACertAndKey(url, zone, token)
 	if err != nil {
-		log.Println("Error: Could not initialize Root CA: ", err)
+		log.Debugln("Error: Could not initialize Root CA: ", err)
 		return errors.New("TPP Error:" + err.Error())
 	}
 
-	log.Println("Root CA Certificate now: ", serverState.rootCACert.Subject.CommonName)
-	log.Println("Sub CA Certificate now: ", serverState.subCACert.Subject.CommonName)
+	log.Debugln("Root CA Certificate now: ", serverState.rootCACert.Subject.CommonName)
+	log.Debugln("Sub CA Certificate now: ", serverState.subCACert.Subject.CommonName)
 
 	defaultValues, restrictions, err := tpp.TPPGetPolicy(url, zone, token)
 
-	log.Println("TPP Default values from policy:", defaultValues)
+	log.Debugln("TPP Default values from policy:", defaultValues)
 
-	log.Println("Reading enforced locked values from TPP policy:", restrictions)
+	log.Debugln("Reading enforced locked values from TPP policy:", restrictions)
 	policies.ApplyTPPValues(defaultValues, restrictions)
 
 	setupTLSConnection(certDir)
@@ -192,22 +217,22 @@ func InitStateUsingTPP(url, zone, token, certDir string) (err error) {
 }
 
 func InitStateUsingTPPPassthrough(url, zone, token, certDir string) (err error) {
-
+	serverState.mode = mode4TPPPassthrough
 	serverState.tppToken = token
 	serverState.tppURL = url
 	serverState.tppZone = zone
 	serverState.passthrough = true
 
-	log.Println("Initializing EdgeCA in pass-through mode. All requests will be forwarded using TPP")
+	log.Debugln("Initializing EdgeCA in pass-through mode. All requests will be forwarded using TPP")
 
 	// the mTLS connection to our client still uses a self-signed certificate...
 	InitState(certDir)
 
 	defaultValues, restrictions, err := tpp.TPPGetPolicy(url, zone, token)
 
-	log.Println("TPP Default values from policy:", defaultValues)
+	log.Debugln("TPP Default values from policy:", defaultValues)
 
-	log.Println("Reading enforced locked values from TPP policy:", restrictions)
+	log.Debugln("Reading enforced locked values from TPP policy:", restrictions)
 	policies.ApplyTPPValues(defaultValues, restrictions)
 
 	return nil
