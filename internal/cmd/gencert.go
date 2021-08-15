@@ -34,11 +34,10 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-var csrFile, certFileName, certkeyFileName, certtlsCertDir, tlsHostName string
-var certTLSPort int
+var csrFile, certFileName, certkeyFileName string
 
 func init() {
-	var gencsr = &cobra.Command{
+	var gencertCmd = &cobra.Command{
 		Use:   "gencert",
 		Short: "Create a Certificate",
 		Run: func(cmd *cobra.Command, args []string) {
@@ -47,32 +46,35 @@ func init() {
 
 		}}
 
-	rootCmd.AddCommand(gencsr)
+	rootCmd.AddCommand(gencertCmd)
 
-	gencsr.Flags().StringVarP(&csrFile, "csr", "i", "", "Input CSR file")
-	gencsr.Flags().StringVarP(&certFileName, "cert", "o", "", "Output Certificate file")
-	gencsr.Flags().StringVarP(&certkeyFileName, "key", "k", "", "Output Private Key file")
-	certtlsCertDir = config.GetDefaultTLSCertDir()
-	gencsr.Flags().StringVarP(&certtlsCertDir, "auth-dir", "", certtlsCertDir, "Location of certs for gRPC authentication")
-	tlsHostName = config.GetDefaultTLSHost()
-	gencsr.Flags().StringVarP(&tlsHostName, "server", "", tlsHostName, "EdgeCA gRPC server name")
-	certTLSPort = config.GetDefaultTLSPort()
-	gencsr.Flags().IntVarP(&certTLSPort, "port", "", certTLSPort, "TLS port of gRPC server")
+	gencertCmd.Flags().StringVarP(&csrFile, "csr", "i", "", "Input CSR file")
+	gencertCmd.Flags().StringVarP(&certFileName, "cert", "o", "", "Output Certificate file")
+	gencertCmd.Flags().StringVarP(&certkeyFileName, "key", "k", "", "Output Private Key file")
 
-	gencsr.MarkFlagRequired("csr")
-	gencsr.Flags().BoolVarP(&useDebugLogging, "debug", "d", false, "Enable Debug logging")
+	gencertCmd.MarkFlagRequired("csr")
+
+	configDir = config.GetDefaultConfdir()
+	gencertCmd.Flags().StringVarP(&configDir, "confdir", "", configDir, "Configuration Directory")
 
 }
 
 func grpcGenerateCertificate() {
 
-	if useDebugLogging {
+	config.InitCLIConfiguration(configDir)
+
+	certTLSPort := config.GetServerTLSPort()
+	tlsHostName := config.GetServerTLSHost()
+	certtlsCertDir := getTLSCertDir()
+
+	if config.GetDebugLogLevel() {
 		log.SetLevel(log.DebugLevel)
 		log.Debugln("EdgeCA v" + edgeca.Version + " debug logging enabled")
 
 	}
 
 	csr := getcsr()
+
 	log.Debugln("Connecting to edgeca server at " + tlsHostName + " to sign certificate")
 
 	conn, c := grpcConnect(certtlsCertDir, tlsHostName, certTLSPort)
@@ -95,7 +97,7 @@ func grpcGenerateCertificate() {
 		if err != nil {
 			log.Fatalf("Error writing Certificate to %s: %v", certFileName, err)
 		} else {
-			log.Debugln("Wrote Certificate to %s", certFileName)
+			log.Infof("Wrote Certificate to %s", certFileName)
 		}
 
 	} else {
@@ -107,7 +109,7 @@ func grpcGenerateCertificate() {
 		if err != nil {
 			log.Fatalf("Error writing key to %s: %v", certkeyFileName, err)
 		} else {
-			log.Debugln("Wrote key to %s", certkeyFileName)
+			log.Infof("Wrote key to %s", certkeyFileName)
 		}
 
 	} else {

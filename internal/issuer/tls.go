@@ -27,7 +27,7 @@ import (
 )
 
 func GenerateTLSServerCert(server string, parentCert *x509.Certificate, parentKey *rsa.PrivateKey) (*tls.Certificate, error) {
-	log.Debugln("Creating TLS server certificate for ", server)
+	log.Infoln("Creating TLS server certificate for ", server)
 	subject := pkix.Name{
 		Organization:       []string{"EdgeCA"},
 		OrganizationalUnit: []string{},
@@ -85,14 +85,14 @@ func GenerateTLSClientCert(server string, parentCert *x509.Certificate, parentKe
 		if err != nil {
 			log.Fatalf("Error writing output to %s: %v", certfilename, err)
 		}
-		log.Debugf("Writing TLS Client certificate to %s", certfilename)
+		log.Infof("Writing TLS Client certificate to %s", certfilename)
 	}
 	if keyfilename != "" {
 		err := ioutil.WriteFile(keyfilename, pemKey, 0644)
 		if err != nil {
 			log.Fatalf("Error writing output to %s: %v", keyfilename, err)
 		}
-		log.Debugf("Writing TLS Client key to %s", keyfilename)
+		log.Infof("Writing TLS Client key to %s", keyfilename)
 	}
 	return &cert, err
 }

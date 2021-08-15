@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -28,10 +29,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var policy, defaultConfig, tppToken, tppURL, tppZone, caCert, caKey, serverTlsCertDir string
-var tlsPort, graphQLport int
-var useSDS, usePassthrough bool
-var useDebugLogging bool
+var configDir string
 
 func init() {
 
@@ -40,38 +38,10 @@ func init() {
 		Short: "Run the EdgeCA server",
 		Long: `The EdgeCA server can run in four modes
 	
-		Mode 1: Self-signed
-		-------------------
-		./edgeca server [-p policy_file]
-		
-		In this mode, EdgeCA starts up, creates a self-signed certificate 
-		and optionally reads in an OPA policy file. 
-		
-		Mode 2:  Bring your own CA Certificate
-		--------------------------
-		./edgeca server [-p policy_file] -c certificate.pem -k key.pem
-		
-		In this mode, EdgeCA starts up, reads the CA certificate and key
-		from the provided PEM files and optionally reads in an OPA policy file 
-			
-		Mode 3: Get issuing certificate using TPP
-		-------------------------------
-		./edgeca server -t TPP-token
-		
-		EdgeCA gets an issuing certificate using the TPP token.
-		It reads in the policy and default configuration from the TPP server 
-
-		Mode 4: Use TPP to issue certificates
-		-------------------------------
-		./edgeca server -t TPP-token --passthrough
-	
-		In this mode, EdgeCA does not use an issuing certificate and issues
-		no certificates locally. Instead it passes all requestes back to the back-end
-		using TPP. 
 
 	
 	Note: The server uses mTLS to communicate with the edgeca CLI. It does so using 
-	client certificates written to the location specified by "tls-certs". 
+	client certificates written to the location specified by "grpc-server/tls-certificates". 
 	If the CLI client is used on a different computer, then these certificates need to be
 	copied across for the client to use.
 		`,
@@ -82,127 +52,136 @@ func init() {
 		}}
 
 	rootCmd.AddCommand(serverCmd)
-
-	serverCmd.Flags().StringVarP(&policy, "policy", "p", "", "Policy File")
-
-	serverCmd.Flags().StringVarP(&caCert, "ca-cert", "c", "", "Issuing Certificate File")
-	serverCmd.Flags().StringVarP(&caKey, "ca-key", "k", "", "Issuing Certificate Key File")
-
-	serverCmd.Flags().StringVarP(&tppToken, "token", "t", "", "TPP Token")
-	serverCmd.Flags().StringVarP(&tppURL, "url", "u", "", "TPP URL")
-	serverCmd.Flags().StringVarP(&tppZone, "zone", "z", "", "TPP Zone")
-
-	serverTlsCertDir = config.GetDefaultTLSCertDir()
-	serverCmd.Flags().StringVarP(&serverTlsCertDir, "auth-dir", "", serverTlsCertDir, "Directory to write gRPC TLS Client certificates to")
-
-	tlsPort = config.GetDefaultTLSPort()
-	serverCmd.Flags().IntVarP(&tlsPort, "port", "", tlsPort, "Port number to use for this server")
-
-	serverCmd.Flags().BoolVarP(&useSDS, "sds", "", false, "Enable Envoy SDS support (development use only)")
-	serverCmd.Flags().BoolVarP(&usePassthrough, "passthrough", "", false, "Don't use an issuing certificate or issue certitificates locally. Pass all requests directly to TPP. ")
-
-	serverCmd.Flags().IntVarP(&graphQLport, "graphql", "", 0, "Start a GraphQL server on the specified port")
-
-	serverCmd.Flags().BoolVarP(&useDebugLogging, "debug", "d", false, "Enable Debug logging")
+	configDir = config.GetDefaultConfdir()
+	serverCmd.Flags().StringVarP(&configDir, "confdir", "", configDir, "Configuration Directory")
 
 }
 
 // Execute the commands
 func startEdgeCAServer() {
 	fmt.Println("EdgeCA server " + edgeca.Version + " starting up")
-	if useDebugLogging {
+
+	config.InitCLIConfiguration(configDir)
+
+	if config.GetDebugLogLevel() {
 		log.SetLevel(log.DebugLevel)
 		log.Debugln("Debug logging enabled")
 
 	}
 
-	if tppToken != "" || tppURL != "" || tppZone != "" || usePassthrough {
-		if usePassthrough {
-			mode4UsePassthrough()
-		} else {
-			mode3UseTPP()
+	if config.UsingSelfSignedMode() {
+
+		log.Infoln("Server mode: self-signed")
+		policy := config.GetPolicyFile()
+		serverTlsCertDir := getTLSCertDir()
+		if policy != "" {
+			policies.LoadPolicy(policy)
+		}
+		state.InitState(serverTlsCertDir)
+
+	} else if config.UsingUserCertMode() {
+
+		log.Infoln("Server mode: user-provided CA certificate and private key")
+
+		policy := config.GetPolicyFile()
+		serverTlsCertDir := getTLSCertDir()
+		caCert, caKey := config.GetUserProvidedCACert()
+		if policy != "" {
+			policies.LoadPolicy(policy)
+		}
+		err := state.InitStateUsingCerts(caCert, caKey, serverTlsCertDir)
+		if err != nil {
+			log.Fatalf("Error: %v", err.Error())
 		}
 
-	} else if caCert != "" || caKey != "" {
-		mode2BYOCert()
+	} else if config.UsingIssuingCertMode() {
 
+		log.Infoln("Server mode: Using TPP")
+
+		policy := config.GetPolicyFile()
+		serverTlsCertDir := getTLSCertDir()
+		caCert, caKey := config.GetUserProvidedCACert()
+		tppToken, tppURL, tppZone := config.GetTPPCredentials()
+
+		if caCert != "" || caKey != "" {
+			log.Warnln("Ignoring user-provided CA-Cert and CA-Key from configuration")
+		}
+		if tppToken == "" || tppURL == "" || tppZone == "" {
+			log.Fatalln("Error: TPP Token, URL and Zone all need to be specified.")
+		}
+
+		if policy != "" {
+			log.Warnln("Ignoring OPA policy file from configuration - using TPP policy information")
+		}
+
+		err := state.InitStateUsingTPP(tppURL, tppZone, tppToken, serverTlsCertDir)
+
+		if err != nil {
+			log.Fatalf("TPPLogin error: %v", err.Error())
+		} else {
+			log.Infoln("TPPLogin OK")
+		}
+	} else if config.UsingTPPPassthroughMode() {
+
+		log.Infoln("Server mode: TPP/Passthrough. All requests will be forwarded using TPP")
+
+		tppToken, tppURL, tppZone := config.GetTPPCredentials()
+
+		caCert, caKey := config.GetUserProvidedCACert()
+		policy := config.GetPolicyFile()
+		serverTlsCertDir := getTLSCertDir()
+
+		if caCert != "" || caKey != "" {
+			log.Warnln("Ignoring user-provided CA-Cert and CA-Key from configuration")
+		}
+
+		if tppToken == "" || tppURL == "" || tppZone == "" {
+			log.Fatalln("Error: TPP Token, URL and Zone all need to be specified.")
+		}
+
+		if policy != "" {
+			log.Warnln("Ignoring OPA policy file from configuration - using TPP policy information")
+		}
+
+		err := state.InitStateUsingTPPPassthrough(tppURL, tppZone, tppToken, serverTlsCertDir)
+		if err != nil {
+			log.Fatalf("TPPLogin error: %v", err.Error())
+		} else {
+			log.Infoln("TPPLogin OK")
+		}
 	} else {
-		mode1SelfCert()
+		log.Fatalf("No valid server mode enabled in configuration")
 	}
 
-	if graphQLport > 0 {
-		server.StartGraphqlServer(graphQLport)
+	graphQLPort := config.GetGraphQLPort()
+	useSDS := config.GetUseSDS()
+	tlsPort := config.GetServerTLSPort()
+
+	if graphQLPort > 0 {
+		log.Infof("GraphQL server started on port %d (gRPC disabled)", graphQLPort)
+		server.StartGraphqlServer(graphQLPort)
 	} else {
+		log.Infof("GraphQL server disabled")
+		if useSDS {
+			log.Infof("SDS server enabled")
+		} else {
+			log.Infof("SDS server disabled")
+		}
+		log.Infof("gRPC server started on port %d", tlsPort)
+
 		server.StartGrpcServer(tlsPort, useSDS)
 	}
 
 }
 
-func mode1SelfCert() {
+func getTLSCertDir() string {
 
-	if policy != "" {
-		policies.LoadPolicy(policy)
-	}
+	defaultTLSCertDir := configDir + "/certs"
 
-	log.Infoln("Mode 1 (Using self-signed issuing certificate and key)")
-	state.InitState(serverTlsCertDir)
-
-}
-
-func mode2BYOCert() {
-	if policy != "" {
-		policies.LoadPolicy(policy)
-	}
-
-	log.Infoln("Mode 2 (Using provided issuing certificate and key).")
-	err := state.InitStateUsingCerts(caCert, caKey, serverTlsCertDir)
-
-	if err != nil {
-		log.Fatalf("Error: %v", err.Error())
-	}
-}
-
-func mode3UseTPP() {
-	if caCert != "" || caKey != "" {
-		log.Fatalln("Mode 3 (Using TPP). Error: If TPP-Token is specified, then CA-Cert and CA-Key can't also be specified. ")
-	}
-	if tppToken == "" || tppURL == "" || tppZone == "" {
-		log.Fatalln("Mode 3 (Using TPP). Error: TPP Token, URL and Zone all need to be specified.")
-	}
-
-	if policy != "" || defaultConfig != "" {
-		log.Warnln("Mode 3 (Using TPP). Warning: If TPP-Token is specified, policy file settings are ignored.")
-	}
-
-	log.Infoln("Mode 3 (Using TPP). Connecting using specified TPP token, URL and Zone")
-
-	err := state.InitStateUsingTPP(tppURL, tppZone, tppToken, serverTlsCertDir)
-
-	if err != nil {
-		log.Fatalf("TPPLogin error: %v", err.Error())
+	if _, err := os.Stat(defaultTLSCertDir); os.IsNotExist(err) {
+		_ = os.Mkdir(defaultTLSCertDir, 0755)
 	} else {
-		log.Infoln("TPPLogin OK")
-	}
-}
-
-func mode4UsePassthrough() {
-	if caCert != "" || caKey != "" {
-		log.Fatalln("Mode 4 (Using TPP/Passthrough). Error: If TPP-Token is specified, then CA-Cert and CA-Key can't also be specified. ")
-	}
-	if tppToken == "" || tppURL == "" || tppZone == "" {
-		log.Fatalln("Mode 4 (Using TPP/Passthrough). Error: TPP Token, URL and Zone all need to be specified.")
 	}
 
-	if policy != "" || defaultConfig != "" {
-		log.Warnln("Mode 4 (Using TPP/Passthrough). Warning: If TPP-Token is specified, policy file settings are ignored.")
-	}
-
-	log.Infoln("Mode 4 (Using TPP/Passthrough). Connecting using specified TPP token, URL and Zone")
-
-	err := state.InitStateUsingTPPPassthrough(tppURL, tppZone, tppToken, serverTlsCertDir)
-	if err != nil {
-		log.Fatalf("TPPLogin error: %v", err.Error())
-	} else {
-		log.Infoln("TPPLogin OK")
-	}
+	return defaultTLSCertDir
 }
