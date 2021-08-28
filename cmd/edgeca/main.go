@@ -17,10 +17,8 @@ package main
 
 import (
 	"github.com/edgesec-org/edgeca/internal/cmd"
-	"github.com/edgesec-org/edgeca/internal/config"
 )
 
 func main() {
-	config.InitCLIConfiguration()
 	cmd.Execute()
 }

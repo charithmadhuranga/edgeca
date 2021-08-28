@@ -171,7 +171,7 @@ func setupTLSConnection(certDir string) {
 	}
 
 	filename := certDir + "/CA.pem"
-	log.Debugln("Writing Root CA Certificate to ", filename)
+	log.Infoln("Writing Root CA Certificate to ", filename)
 	cert := GetRootCACert()
 	subCA := GetSubCAPEMCert()
 	certs := make([]byte, len(cert)+len(subCA))

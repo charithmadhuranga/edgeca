@@ -35,9 +35,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var commonName, organization, organizationalUnit, locality, province, country, keyFileName, csrFileName, csrTlsCertDir, csrHostName string
+var commonName, organization, organizationalUnit, locality, province, country, keyFileName, csrFileName string
 var refresh bool
-var csrTLSPort int
 
 func init() {
 	var gencsr = &cobra.Command{
@@ -61,18 +60,17 @@ func init() {
 	gencsr.Flags().StringVarP(&keyFileName, "key", "", "", "Output file for private key used to sign CSR")
 	gencsr.Flags().StringVarP(&csrFileName, "csr", "", "", "Output file for CSR")
 	gencsr.Flags().BoolVarP(&refresh, "refresh", "r", false, "Refresh the list of default values from the current policy")
-	csrTlsCertDir = config.GetDefaultTLSCertDir()
-	gencsr.Flags().StringVarP(&csrTlsCertDir, "auth-dir", "", csrTlsCertDir, "Location of certs for gRPC authentication")
-	csrHostName = config.GetDefaultTLSHost()
-	gencsr.Flags().StringVarP(&csrHostName, "server", "s", csrHostName, "EdgeCA gRPC server name")
-	csrTLSPort = config.GetDefaultTLSPort()
-	gencsr.Flags().IntVarP(&csrTLSPort, "port", "", csrTLSPort, "TLS port of gRPC server")
-	gencsr.Flags().BoolVarP(&useDebugLogging, "debug", "d", false, "Enable Debug logging")
+
+	configDir = config.GetDefaultConfdir()
+	gencsr.Flags().StringVarP(&configDir, "confdir", "", configDir, "Configuration Directory")
+
 }
 
 func generateCSR() {
 
-	if useDebugLogging {
+	config.InitCLIConfiguration(configDir)
+
+	if config.GetDebugLogLevel() {
 		log.SetLevel(log.DebugLevel)
 		log.Debugln("EdgeCA v" + edgeca.Version + " debug logging enabled")
 
@@ -80,9 +78,13 @@ func generateCSR() {
 
 	// only use gRPC if --refresh is set
 	if refresh {
-		log.Debugln("Connecting to edgeca server at " + csrHostName + " to refresh policy information")
+		server := config.GetServerTLSHost()
+		mtlsDir := getTLSCertDir()
+		csrTLSPort := config.GetServerTLSPort()
 
-		conn, c := grpcConnect(csrTlsCertDir, csrHostName, csrTLSPort)
+		log.Debugln("Connecting to edgeca server at " + server + " to refresh policy information")
+
+		conn, c := grpcConnect(mtlsDir, server, csrTLSPort)
 		defer conn.Close()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()

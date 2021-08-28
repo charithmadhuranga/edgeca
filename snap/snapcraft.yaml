@@ -12,14 +12,9 @@ confinement: strict
 apps:
   edgeca:
     adapter: none
-    command: bin/edgeca-wrapper.sh
-    plugs: [home, network]
-
-  edgeca-server:
-    adapter: none
-    daemon: simple
-    command: bin/edgecad-wrapper.sh
+    command: bin/edgeca 
     plugs: [home, network, network-bind]
+ 
 
 parts:
   version:
@@ -45,12 +40,6 @@ parts:
     override-build: |
       export PATH="$SNAPCRAFT_STAGE/go/bin:$GOPATH/bin:$PATH"
       cd $SNAPCRAFT_PART_SRC
-      export GO111MODULE=on # Enable module mode
-      go get ./...   
-      go build ./cmd/edgeca 
-
-      install -DT "./edgeca" "$SNAPCRAFT_PART_INSTALL/bin/edgeca" 
-      
-  config-common:
-      plugin: dump
-      source: snap/local/runtime-helpers
+      make
+      install -DT "./bin/edgeca" "$SNAPCRAFT_PART_INSTALL/bin/edgeca" 
+  

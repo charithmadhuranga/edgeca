@@ -16,6 +16,7 @@
 package config
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 
@@ -27,57 +28,72 @@ import (
 var configFile string
 
 type Config struct {
-	CSR struct {
-		Organization       string `yaml:"organization"`
-		OrganizationalUnit string `yaml:"organizationalUnit"`
+	ServerProtocols struct {
+		SDSEnabled  bool   `yaml:"sds-enabled"`
+		GraphQLPort int    `yaml:"graphql-port"`
+		GRPCPort    int    `yaml:"grpc-port"`
+		GRPCHost    string `yaml:"grpc-host"`
+	} `yaml:"server-protocols"`
 
-		Country  string `yaml:"country"`
-		Province string `yaml:"province"`
-		Locality string `yaml:"locality"`
-	} `yaml:"default-csr-values"`
+	ServerMode struct {
+		SelfSigned     bool `yaml:"self-signed"`
+		UserCert       bool `yaml:"user-provided"`
+		IssuingCert    bool `yaml:"issuing-certificate"`
+		TPPPassthrough bool `yaml:"tpp-passthrough"`
+	} `yaml:"server-mode"`
+
+	Policy struct {
+		Filename           string `yaml:"opa-policy-file"`
+		Organization       string `yaml:"default-organization"`
+		OrganizationalUnit string `yaml:"default-organizationalUnit"`
+		Country            string `yaml:"default-country"`
+		Province           string `yaml:"default-province"`
+		Locality           string `yaml:"default-locality"`
+	} `yaml:"policy"`
+	TPP struct {
+		Token string `yaml:"token"`
+		URL   string `yaml:"url"`
+		Zone  string `yaml:"zone"`
+	} `yaml:"tpp"`
+
+	UserProvided struct {
+		Certificate string `yaml:"certificate"`
+		PrivateKey  string `yaml:"private-key"`
+	} `yaml:"user-provided"`
+
+	Logging struct {
+		Debug bool `yaml:"debug"`
+	} `yaml:"logging"`
 }
 
 var defaultConfig Config
 
-func GetDefaultTLSPort() int {
-	return 50025
-}
-
-func GetDefaultTLSHost() string {
-	hostName, _ := os.Hostname()
-	return hostName
-}
-
-func GetDefaultTLSCertDir() string {
+func GetDefaultConfdir() string {
 	homeDir, _ := os.UserHomeDir()
-	configDir := homeDir + "/.edgeca"
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		_ = os.Mkdir(configDir, 0755)
-	} else {
-	}
+	return homeDir + "/.edgeca"
 
-	defaultTLSCertDir := configDir + "/certs"
-
-	if _, err := os.Stat(defaultTLSCertDir); os.IsNotExist(err) {
-		_ = os.Mkdir(defaultTLSCertDir, 0755)
-	} else {
-	}
-
-	return defaultTLSCertDir
 }
 
-func InitCLIConfiguration() {
-	homeDir, _ := os.UserHomeDir()
-	configDir := homeDir + "/.edgeca"
-
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
-		_ = os.Mkdir(configDir, 0755)
-	} else {
-	}
+func InitCLIConfiguration(configDir string) {
 
 	configFile = configDir + "/config.yaml"
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		log.Infof("Creating config directory at : %s", configDir)
+		_ = os.Mkdir(configDir, 0755)
 	} else {
+	}
+
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+
+		// Create a new config file with default values
+		defaultConfig.ServerProtocols.GRPCPort = 50025
+		defaultConfig.ServerProtocols.GRPCHost = GetDefaultTLSHost()
+		defaultConfig.ServerMode.SelfSigned = true
+		log.Infof("Creating default configuration file at : %s", configFile)
+		WriteConfigFile()
+
+	} else {
+		log.Infof("Loading configuration file : %s", configFile)
 
 		yamlFile, err := ioutil.ReadFile(configFile)
 		if err != nil {
@@ -89,14 +105,10 @@ func InitCLIConfiguration() {
 			log.Fatalln("Could not unmarshal config:", err)
 		}
 	}
+
 }
 
-func SetCSRConfiguration(o string, ou string, c string, p string, l string) error {
-	defaultConfig.CSR.Organization = o
-	defaultConfig.CSR.OrganizationalUnit = ou
-	defaultConfig.CSR.Country = c
-	defaultConfig.CSR.Locality = l
-	defaultConfig.CSR.Province = p
+func WriteConfigFile() error {
 
 	marshalled, err := yaml.Marshal(&defaultConfig)
 	if err != nil {
@@ -109,6 +121,15 @@ func SetCSRConfiguration(o string, ou string, c string, p string, l string) erro
 	}
 	log.Debugln("Updated configuration file " + configFile)
 	return nil
+
+}
+
+func SetCSRConfiguration(o string, ou string, c string, p string, l string) {
+	defaultConfig.Policy.Organization = o
+	defaultConfig.Policy.OrganizationalUnit = ou
+	defaultConfig.Policy.Country = c
+	defaultConfig.Policy.Locality = l
+	defaultConfig.Policy.Province = p
 }
 
 func GetConfigurationFileContents() (string, error) {
@@ -121,22 +142,155 @@ func GetConfigurationFileContents() (string, error) {
 
 }
 
+func SetGraphQLPort(port int) {
+	defaultConfig.ServerProtocols.GraphQLPort = port
+}
+
+func GetGraphQLPort() int {
+	return defaultConfig.ServerProtocols.GraphQLPort
+}
+
+func SetUseSDS(v bool) {
+	defaultConfig.ServerProtocols.SDSEnabled = v
+}
+
+func GetUseSDS() bool {
+	return defaultConfig.ServerProtocols.SDSEnabled
+}
+
+func SetTPPCredentials(tppToken, tppURL, tppZone string) {
+	defaultConfig.TPP.Token = tppToken
+	defaultConfig.TPP.URL = tppURL
+	defaultConfig.TPP.Zone = tppZone
+}
+
+func GetTPPCredentials() (tppToken, tppURL, tppZone string) {
+	return defaultConfig.TPP.Token, defaultConfig.TPP.URL, defaultConfig.TPP.Zone
+}
+
 func GetDefaultOrganization() string {
-	return defaultConfig.CSR.Organization
+	return defaultConfig.Policy.Organization
 }
 
 func GetDefaultOrganizationalUnit() string {
-	return defaultConfig.CSR.OrganizationalUnit
+	return defaultConfig.Policy.OrganizationalUnit
 }
 
 func GetDefaultCountry() string {
-	return defaultConfig.CSR.Country
+	return defaultConfig.Policy.Country
 }
 
 func GetDefaultLocality() string {
-	return defaultConfig.CSR.Locality
+	return defaultConfig.Policy.Locality
 }
 
 func GetDefaultProvince() string {
-	return defaultConfig.CSR.Province
+	return defaultConfig.Policy.Province
+}
+
+func GetServerTLSHost() string {
+	return defaultConfig.ServerProtocols.GRPCHost
+}
+
+func SetServerTLSHost(v string) {
+	defaultConfig.ServerProtocols.GRPCHost = v
+}
+
+func GetServerTLSPort() int {
+	return defaultConfig.ServerProtocols.GRPCPort
+}
+
+func SetServerTLSPort(v int) {
+	defaultConfig.ServerProtocols.GRPCPort = v
+}
+
+func GetPolicyFile() string {
+	return defaultConfig.Policy.Filename
+}
+
+func SetPolicyFile(configPolicy string) {
+	defaultConfig.Policy.Filename = configPolicy
+}
+
+func GetUserProvidedCACert() (string, string) {
+	return defaultConfig.UserProvided.Certificate, defaultConfig.UserProvided.PrivateKey
+
+}
+
+func SetUserProvidedCACert(configCACert, configCAKey string) {
+	defaultConfig.UserProvided.Certificate = configCACert
+	defaultConfig.UserProvided.PrivateKey = configCAKey
+
+}
+
+func GetDebugLogLevel() bool {
+	return defaultConfig.Logging.Debug
+
+}
+
+func SetDebugLogLevel(configDebugLogging bool) {
+	defaultConfig.Logging.Debug = configDebugLogging
+
+}
+
+func GetDefaultTLSHost() string {
+	hostName, _ := os.Hostname()
+	return hostName
+}
+
+func UsingSelfSignedMode() bool {
+	return defaultConfig.ServerMode.SelfSigned
+}
+
+func UsingUserCertMode() bool {
+	return defaultConfig.ServerMode.UserCert
+}
+
+func UsingIssuingCertMode() bool {
+	return defaultConfig.ServerMode.IssuingCert
+}
+
+func UsingTPPPassthroughMode() bool {
+	return defaultConfig.ServerMode.TPPPassthrough
+}
+
+func SetServerMode(mode string) {
+
+	defaultConfig.ServerMode.SelfSigned = false
+	defaultConfig.ServerMode.UserCert = false
+	defaultConfig.ServerMode.IssuingCert = false
+	defaultConfig.ServerMode.TPPPassthrough = false
+
+	switch mode {
+	case "self-signed":
+		defaultConfig.ServerMode.SelfSigned = true
+
+	case "user-provided":
+		defaultConfig.ServerMode.UserCert = true
+
+	case "issuing-certificate":
+		defaultConfig.ServerMode.IssuingCert = true
+
+	case "tpp-passthrough":
+		defaultConfig.ServerMode.TPPPassthrough = true
+
+	default:
+		log.Fatalf("Invalid Mode: %s", mode)
+	}
+
+}
+
+func GetServerModeString() (string, error) {
+
+	if defaultConfig.ServerMode.SelfSigned {
+		return "self-signed", nil
+	} else if defaultConfig.ServerMode.UserCert {
+		return "user-provided", nil
+	} else if defaultConfig.ServerMode.IssuingCert {
+		return "issuing-certificate", nil
+	} else if defaultConfig.ServerMode.TPPPassthrough {
+		return "tpp-passthrough", nil
+	} else {
+		return "", errors.New("no Server Mode configured")
+	}
 }

@@ -76,7 +76,7 @@ func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.Cert
 	} else {
 		var bCertificate, bPrivateKey []byte
 
-		log.Debugln("gRPC request: certificate for " + subject.CommonName + " from issuer: " + state.GetStateDescription())
+		log.Infoln("gRPC request: certificate for " + subject.CommonName + " from issuer: " + state.GetStateDescription())
 
 		bCertificate, bPrivateKey, _, err = issuer.GenerateCertificateUsingX509Subject(subject, state.GetSubCACert(), state.GetSubCAKey())
 		pemCertificate = string(bCertificate)

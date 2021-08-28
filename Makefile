@@ -3,7 +3,6 @@ GIT_VERSION=$(shell git describe --tags --abbrev=0 | sed 's/v//')
 GOFLAGS=-ldflags "-X github.com/edgesec-org/edgeca.Version=$(GIT_VERSION)"
 
 all: 
-	echo $(GOFLAGS)
 	go mod tidy
 	go get ./...
 	go build $(GOFLAGS) -o bin/edgeca ./cmd/edgeca 
