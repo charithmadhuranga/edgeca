@@ -15,7 +15,7 @@
 
 FROM golang:1.16-alpine AS build_base
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git gcc libc-dev
 
 WORKDIR /tmp/edgeca
 COPY go.mod .
