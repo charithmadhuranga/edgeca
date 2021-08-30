@@ -54,7 +54,7 @@ func (r *mutationResolver) CreateCertificate(ctx context.Context, input model.Ne
 
 		var bCertificate, bPrivateKey []byte
 
-		bCertificate, bPrivateKey, expiryStr, err = issuer.GenerateCertificateUsingX509Subject(subject, state.GetSubCACert(), state.GetSubCAKey())
+		bCertificate, bPrivateKey, expiryStr, err = issuer.GenerateCertificateUsingX509Subject(subject)
 		pemCertificate = string(bCertificate)
 		pemPrivateKey = string(bPrivateKey)
 	}

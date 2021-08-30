@@ -26,6 +26,7 @@ import (
 )
 
 var configFile string
+var hsmConfigFile string
 
 type Config struct {
 	ServerProtocols struct {
@@ -64,6 +65,12 @@ type Config struct {
 	Logging struct {
 		Debug bool `yaml:"debug"`
 	} `yaml:"logging"`
+	HSM struct {
+		Path          string `yaml:"path"`
+		TokenLabel    string `yaml:"token-label"`
+		Pin           string `yaml:"pin"`
+		SoftHSMConfig string `yaml:"soft-hsm-config"`
+	} `yaml:"hsm"`
 }
 
 var defaultConfig Config
@@ -74,9 +81,38 @@ func GetDefaultConfdir() string {
 
 }
 
+func GetSoftHSMConfigFile() string {
+	return hsmConfigFile
+}
+
+func setupSoftHSMLibrary() (string, error) {
+	if _, err := os.Stat("/usr/lib/softhsm/libsofthsm2.so"); err == nil {
+		return "/usr/lib/softhsm/libsofthsm2.so", nil
+	} else if _, err := os.Stat("/usr/local/lib/softhsm/libsofthsm2.so"); err == nil {
+		return "/usr/local/lib/softhsm/libsofthsm2.so", nil
+	} else {
+		return "", errors.New("can't find libsofthsm2.so")
+	}
+}
+
+func setDefaultHSMConfiguration() {
+	defaultPin := "1234"
+	defaultID := "edgeca"
+	library, err := setupSoftHSMLibrary()
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+
+	SetHSMConfiguration(library, defaultID, defaultPin)
+
+}
+
 func InitCLIConfiguration(configDir string) {
 
 	configFile = configDir + "/config.yaml"
+
+	hsmConfigFile = configDir + "/hsm/softhsm2.conf"
+
 	if _, err := os.Stat(configDir); os.IsNotExist(err) {
 		log.Infof("Creating config directory at : %s", configDir)
 		_ = os.Mkdir(configDir, 0755)
@@ -89,6 +125,9 @@ func InitCLIConfiguration(configDir string) {
 		defaultConfig.ServerProtocols.GRPCPort = 50025
 		defaultConfig.ServerProtocols.GRPCHost = GetDefaultTLSHost()
 		defaultConfig.ServerMode.SelfSigned = true
+
+		setDefaultHSMConfiguration()
+
 		log.Infof("Creating default configuration file at : %s", configFile)
 		WriteConfigFile()
 
@@ -124,6 +163,19 @@ func WriteConfigFile() error {
 
 }
 
+func IsHSMEnaabled() bool {
+	return (defaultConfig.HSM.Path != "" && defaultConfig.HSM.TokenLabel != "" && defaultConfig.HSM.Pin != "")
+}
+
+func GetHSMConfiguration() (path, tokenLabel, pin string) {
+	return defaultConfig.HSM.Path, defaultConfig.HSM.TokenLabel, defaultConfig.HSM.Pin
+}
+
+func SetHSMConfiguration(path, tokenLabel, pin string) {
+	defaultConfig.HSM.Path = path
+	defaultConfig.HSM.TokenLabel = tokenLabel
+	defaultConfig.HSM.Pin = pin
+}
 func SetCSRConfiguration(o string, ou string, c string, p string, l string) {
 	defaultConfig.Policy.Organization = o
 	defaultConfig.Policy.OrganizationalUnit = ou

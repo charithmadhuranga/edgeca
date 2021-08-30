@@ -78,7 +78,7 @@ func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.Cert
 
 		log.Infoln("gRPC request: certificate for " + subject.CommonName + " from issuer: " + state.GetStateDescription())
 
-		bCertificate, bPrivateKey, _, err = issuer.GenerateCertificateUsingX509Subject(subject, state.GetSubCACert(), state.GetSubCAKey())
+		bCertificate, bPrivateKey, _, err = issuer.GenerateCertificateUsingX509Subject(subject)
 		pemCertificate = string(bCertificate)
 		pemPrivateKey = string(bPrivateKey)
 
@@ -91,7 +91,7 @@ func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.Cert
 func StartGrpcServer(port int, useSDS bool) {
 
 	certPool := x509.NewCertPool()
-	cacert := state.GetRootCACert()
+	cacert := state.GetRootCAPEMCert()
 	subCA := state.GetSubCAPEMCert()
 	certs := make([]byte, len(cacert)+len(subCA))
 	copy(certs, cacert)

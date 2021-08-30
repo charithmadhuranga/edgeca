@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/99designs/gqlgen v0.13.0
+	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/Venafi/vcert/v4 v4.13.1
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
 	github.com/gogo/protobuf v1.2.1

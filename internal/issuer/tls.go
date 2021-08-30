@@ -16,7 +16,6 @@
 package issuer
 
 import (
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -26,7 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func GenerateTLSServerCert(server string, parentCert *x509.Certificate, parentKey *rsa.PrivateKey) (*tls.Certificate, error) {
+func GenerateTLSServerCert(server string) (*tls.Certificate, error) {
 	log.Infoln("Creating TLS server certificate for ", server)
 	subject := pkix.Name{
 		Organization:       []string{"EdgeCA"},
@@ -37,7 +36,7 @@ func GenerateTLSServerCert(server string, parentCert *x509.Certificate, parentKe
 		Country:            []string{},
 	}
 
-	pemCert, pemKey, _, err := GeneratePemCertificate(subject, parentCert, parentKey)
+	pemCert, pemKey, _, err := GeneratePemCertificate(subject, false)
 	if err != nil {
 		return nil, err
 	}
@@ -56,13 +55,14 @@ func LoadCAServerCert(filename string) (*x509.CertPool, error) {
 
 	certPool := x509.NewCertPool()
 	if !certPool.AppendCertsFromPEM(pemCert) {
-		return nil, errors.New("Could not append CA Certificate")
+		return nil, errors.New("could not append CA Certificate")
 	}
 
 	return certPool, nil
 }
 
-func GenerateTLSClientCert(server string, parentCert *x509.Certificate, parentKey *rsa.PrivateKey, certfilename string, keyfilename string) (*tls.Certificate, error) {
+func GenerateTLSClientCert(server string, certfilename string, keyfilename string) (*tls.Certificate, error) {
+	log.Infoln("Creating TLS client certificate for ", server)
 
 	subject := pkix.Name{
 		Organization:       []string{"EdgeCA"},
@@ -73,7 +73,7 @@ func GenerateTLSClientCert(server string, parentCert *x509.Certificate, parentKe
 		Country:            []string{},
 	}
 
-	pemCert, pemKey, _, err := GeneratePemCertificate(subject, parentCert, parentKey)
+	pemCert, pemKey, _, err := GeneratePemCertificate(subject, false)
 	if err != nil {
 		return nil, err
 	}

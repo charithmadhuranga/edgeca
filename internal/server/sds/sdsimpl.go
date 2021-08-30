@@ -152,7 +152,7 @@ func generateSDSCertificate(host string) (pemCert, pemKey string, err error) {
 		log.Debugln("SDS: Using EdgeCA issuing certificate to sign certificate for " + host)
 
 		var pemCertificate, pemPrivateKey []byte
-		pemCertificate, pemPrivateKey, _, err = certs.GeneratePemCertificate(pkix.Name{CommonName: host}, state.GetSubCACert(), state.GetSubCAKey())
+		pemCertificate, pemPrivateKey, _, err = certs.GeneratePemCertificate(pkix.Name{CommonName: host}, false)
 		pemCertificateString = string(pemCertificate)
 		pemPrivateKeyString = string(pemPrivateKey)
 	}

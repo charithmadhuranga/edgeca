@@ -21,23 +21,45 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"math/big"
-	"time"
 
+	"github.com/edgesec-org/edgeca/internal/config"
 	log "github.com/sirupsen/logrus"
 )
 
 var serialNumber big.Int
-var rootCert *x509.Certificate
-var rsaRootKey *rsa.PrivateKey
-var derRsaRootCert []byte
+
+var rootCACert *x509.Certificate
+var rootCAPrivateKey *rsa.PrivateKey
+var rootCAPEMCert []byte
 
 var subCACert *x509.Certificate
-var rsasubCAKey *rsa.PrivateKey
-var dersubCACert []byte
+var subCAPrivateKey *rsa.PrivateKey
+var subCAPEMCert []byte
 
-func GenerateCertificateUsingX509Subject(subject pkix.Name, subCACert *x509.Certificate, casubCAKeyCert *rsa.PrivateKey) (certificate []byte, key []byte, expiryString string, err error) {
+func GetSubCAPEMCert() []byte {
+	return subCAPEMCert
+}
+
+func GetRootCAPEMCert() []byte {
+	return rootCAPEMCert
+}
+
+func SetRootCA(rootCert *x509.Certificate, pemRootCACert []byte, rsaRootKey *rsa.PrivateKey) {
+	rootCACert = rootCert
+	rootCAPEMCert = pemRootCACert
+	rootCAPrivateKey = rsaRootKey
+
+}
+
+func SetSubCA(rootCert *x509.Certificate, pemRootCACert []byte, rsaRootKey *rsa.PrivateKey) {
+	subCACert = rootCert
+	subCAPEMCert = pemRootCACert
+	subCAPrivateKey = rsaRootKey
+
+}
+
+func GenerateCertificateUsingX509Subject(subject pkix.Name) (certificate []byte, key []byte, expiryString string, err error) {
 
 	//	err = policies.CheckPolicy(csrByteString)
 
@@ -46,7 +68,7 @@ func GenerateCertificateUsingX509Subject(subject pkix.Name, subCACert *x509.Cert
 	//		return nil, nil, err
 	//	}
 
-	pemCertificate, pemPrivateKey, expiryString, err := GeneratePemCertificate(subject, subCACert, casubCAKeyCert)
+	pemCertificate, pemPrivateKey, expiryString, err := GeneratePemCertificate(subject, true)
 	return pemCertificate, pemPrivateKey, expiryString, err
 }
 
@@ -86,7 +108,7 @@ func GenerateCertificateUsingX509SubjectOptionalValues(commonName string, o, ou,
 	//		return nil, nil, err
 	//	}
 
-	pemCertificate, pemPrivateKey, expiryString, err := GeneratePemCertificate(subject, subCACert, casubCAKeyCert)
+	pemCertificate, pemPrivateKey, expiryString, err := GeneratePemCertificate(subject, true)
 	return pemCertificate, pemPrivateKey, expiryString, err
 }
 
@@ -137,123 +159,87 @@ func GetSubjectFromCSR(csr string) (subject pkix.Name) {
 	return
 }
 
-//GenerateSelfSignedSubCACertAndKey generates the sub CA certificate
-func GenerateSelfSignedSubCACertAndKey(parentCert *x509.Certificate, parentKey *rsa.PrivateKey) (certificate *x509.Certificate, pemSubCert []byte, rsasubCAKey *rsa.PrivateKey, err error) {
-	log.Debugf("Generating self signed Sub CA Certificate")
-
-	rsasubCAKey, err = GenerateRSAKey()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	subject := pkix.Name{
-		CommonName: "EdgeCASubCA",
-	}
-
-	unsignedCertificate, _ := generateX509ertificate(subject, x509.KeyUsageCertSign|x509.KeyUsageCRLSign, true)
-
-	derRsaCert, err := signCertificateAndDEREncode(unsignedCertificate, parentCert, parentKey, rsasubCAKey)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	certificate, err = x509.ParseCertificate(derRsaCert)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	pemSubCert = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derRsaCert})
-	return
-}
-
 // GeneratePemCertificate generates a PEM certificate using a CSR
-func GeneratePemCertificate(subject pkix.Name, parentCert *x509.Certificate, parentKey *rsa.PrivateKey) (pemCertificate []byte, pemPrivateKey []byte, expiryString string, err error) {
+func GeneratePemCertificate(subject pkix.Name, possiblyUseHSM bool) (pemCertificate []byte, pemPrivateKey []byte, expiryString string, err error) {
 
-	certificate, expiryString := generateX509ertificate(subject,
-		x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature, false)
+	certificate, expiryString := generateX509ertificate(subject, x509.KeyUsageKeyEncipherment|x509.KeyUsageDigitalSignature, false)
 
-	var serverKey *rsa.PrivateKey
-	serverKey, err = GenerateRSAKey()
+	if config.IsHSMEnaabled() {
+		if possiblyUseHSM {
+			log.Debugf("Signing Certificate for %s using HSM - and storing key in HSM", subject.CommonName)
+			_, pemCertificate, err = GenerateHSMSignedCertificate(certificate, subject.CommonName, subCACert, "EDGECA-SUB-CA")
+			pemPrivateKey = []byte("STORED IN HSM")
+		} else {
+			log.Debugf("Signing Certificate for %s using HSM - and storing private key in EdgeCA", subject.CommonName)
+			var serverKey *rsa.PrivateKey
+			_, pemCertificate, serverKey, err = GenerateHSMSignedCertificateWithPrivateKey(certificate, subCACert, "EDGECA-SUB-CA")
 
-	derServerCert, err := signCertificateAndDEREncode(certificate, parentCert, parentKey, serverKey)
-	if err != nil {
-		return nil, nil, "", err
+			pemPrivateKey = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
+		}
+	} else {
+		log.Debugf("Signing certificate")
+		var serverKey *rsa.PrivateKey
+
+		_, pemCertificate, serverKey, err = GenerateSignedCertificate(certificate, subCACert, subCAPrivateKey)
+
+		pemPrivateKey = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
+
 	}
-
-	pemCertificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derServerCert})
-	pemPrivateKey = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
-
 	return
 }
 
 //GenerateSelfSignedRootCACertAndKey generates the root certificate
-func GenerateSelfSignedRootCACertAndKey() (certificate *x509.Certificate, pemCACert []byte, rsaRootKey *rsa.PrivateKey, err error) {
-	log.Debugf("Generating self signed Root CA Certificate")
-
-	rsaRootKey, err = GenerateRSAKey()
-	if err != nil {
-		return nil, nil, nil, err
-	}
+func GenerateSelfSignedRootCACertAndKey() (err error) {
 
 	subject := pkix.Name{
 		CommonName: "EdgeCARootCA",
 	}
-
 	unsignedCertificate, _ := generateX509ertificate(subject, x509.KeyUsageCertSign|x509.KeyUsageCRLSign, true)
 
-	derRsaRootCert, err = signCertificateAndDEREncode(unsignedCertificate, unsignedCertificate, rsaRootKey, rsaRootKey)
-	if err != nil {
-		log.Debugln("signCertificateAndDEREncode failed:", err)
-		return nil, nil, nil, err
+	if config.IsHSMEnaabled() {
+		log.Debugf("Generating self signed Root CA Certificate using HSM")
+
+		rootCAPrivateKey = nil
+		rootCACert, rootCAPEMCert, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
+
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Debugf("Generating self signed Root CA Certificate")
+
+		rootCACert, rootCAPEMCert, rootCAPrivateKey, err = GenerateSignedCertificate(unsignedCertificate, nil, nil)
+		if err != nil {
+			return err
+		}
 	}
-
-	certificate, err = x509.ParseCertificate(derRsaRootCert)
-	if err != nil {
-		log.Debugln("ParseCertificate failed:", err)
-	}
-
-	pemCACert = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derRsaRootCert})
-
-	return
+	return nil
 }
 
-func generateX509ertificate(subject pkix.Name, keyUsage x509.KeyUsage, isCA bool) (*x509.Certificate, string) {
-
-	notBefore := time.Now()
-	notAfter := notBefore.AddDate(1, 0, 0)
-
-	var cert x509.Certificate
-
-	cert = x509.Certificate{
-		SerialNumber:          &serialNumber,
-		Subject:               subject,
-		DNSNames:              []string{subject.CommonName},
-		NotBefore:             notBefore,
-		NotAfter:              notAfter,
-		BasicConstraintsValid: true,
-		KeyUsage:              keyUsage,
-		IsCA:                  isCA,
+//GenerateSelfSignedSubCACertAndKey generates the sub CA certificate
+func GenerateSelfSignedSubCACertAndKey() (err error) {
+	subject := pkix.Name{
+		CommonName: "EdgeCASubCA",
 	}
+	unsignedCertificate, _ := generateX509ertificate(subject, x509.KeyUsageCertSign|x509.KeyUsageCRLSign, true)
 
-	//	if !isCA {
-	//		cert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
-	//	}
+	if config.IsHSMEnaabled() {
+		log.Debugf("Generating self signed Sub CA Certificate using HSM")
 
-	serialNumber.Add(&serialNumber, big.NewInt(1))
-	notAfterStr := fmt.Sprintf(cert.NotAfter.Format(time.RFC3339))
+		subCAPrivateKey = nil
+		subCACert, subCAPEMCert, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-SUB-CA", rootCACert, "EDGECA-ROOT-CA")
 
-	return &cert, notAfterStr
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Debugf("Generating self signed Sub CA Certificate")
 
-}
+		subCACert, subCAPEMCert, subCAPrivateKey, err = GenerateSignedCertificate(unsignedCertificate, rootCACert, rootCAPrivateKey)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 
-func signCertificateAndDEREncode(certificate, parent *x509.Certificate, parentPrivateKey *rsa.PrivateKey, privateKey *rsa.PrivateKey) (der []byte, err error) {
-
-	der, err = x509.CreateCertificate(rand.Reader, certificate, parent, &privateKey.PublicKey, parentPrivateKey)
-
-	return
-}
-
-func certificateChain() {
-	//	certPool := x509.NewCertPool()
-	//	certPool.AddCert(rootCert)
 }
