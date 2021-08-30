@@ -16,9 +16,7 @@
 package state
 
 import (
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
 	"io/ioutil"
@@ -26,6 +24,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/edgesec-org/edgeca/internal/issuer"
 	certs "github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/policies"
 	"github.com/edgesec-org/edgeca/internal/server/tpp"
@@ -37,12 +36,6 @@ const mode3UseTPP = 3
 const mode4TPPPassthrough = 4
 
 type state struct {
-	rootCACert     *x509.Certificate
-	rootCAKey      *rsa.PrivateKey
-	rootCAPAMCert  []byte
-	subCACert      *x509.Certificate
-	subCAKey       *rsa.PrivateKey
-	subCAPEMCert   []byte
 	tppURL         string
 	tppZone        string
 	tppToken       string
@@ -58,20 +51,12 @@ func UsingPassthrough() bool {
 	return serverState.passthrough
 }
 
-func GetSubCACert() *x509.Certificate {
-	return serverState.subCACert
-}
-
-func GetSubCAKey() *rsa.PrivateKey {
-	return serverState.subCAKey
-}
-
 func GetSubCAPEMCert() []byte {
-	return serverState.subCAPEMCert
+	return issuer.GetSubCAPEMCert()
 }
 
-func GetRootCACert() []byte {
-	return serverState.rootCAPAMCert
+func GetRootCAPEMCert() []byte {
+	return issuer.GetRootCAPEMCert()
 }
 
 func GetServerTLSCert() *tls.Certificate {
@@ -79,14 +64,15 @@ func GetServerTLSCert() *tls.Certificate {
 }
 
 func GetStateDescription() (result string) {
+
 	switch serverState.mode {
 
 	case mode1UseSelfSigned:
-		result = "Local Self Signed CA (" + serverState.subCACert.Subject.CommonName + "/" + serverState.subCACert.Issuer.CommonName + ")"
+		result = "Local Self Signed CA  "
 	case mode2UseBYOCert:
-		result = "User Provided Root CA certificate (" + serverState.subCACert.Subject.CommonName + "/" + serverState.subCACert.Issuer.CommonName + ")"
+		result = "User Provided Root CA certificate "
 	case mode3UseTPP:
-		result = "Venafi TPP (" + serverState.subCACert.Subject.CommonName + "/" + serverState.subCACert.Issuer.CommonName + ")"
+		result = "Venafi TPP"
 	case mode4TPPPassthrough:
 		result = "Venafi TPP passthrough"
 	}
@@ -99,11 +85,11 @@ func InitState(tlsCertDir string) {
 	serverState.mode = mode1UseSelfSigned
 
 	serverState.organization = "EdgeCA"
-	serverState.rootCACert, serverState.rootCAPAMCert, serverState.rootCAKey, err = certs.GenerateSelfSignedRootCACertAndKey()
+	err = certs.GenerateSelfSignedRootCACertAndKey()
 	if err != nil {
 		log.Fatalln("Could not initialize Root CA: ", err)
 	}
-	serverState.subCACert, serverState.subCAPEMCert, serverState.subCAKey, err = certs.GenerateSelfSignedSubCACertAndKey(serverState.rootCACert, serverState.rootCAKey)
+	err = certs.GenerateSelfSignedSubCACertAndKey()
 	if err != nil {
 		log.Fatalln("Could not initialize Sub CA: ", err)
 	}
@@ -135,11 +121,10 @@ func InitStateUsingCerts(caCert, caKey, tlsCertDir string) error {
 	if err != nil {
 		log.Fatalln("Could not initialize Root CA: ", err)
 	}
-	serverState.rootCACert = rootCert
-	serverState.rootCAPAMCert = pemRootCACert
-	serverState.rootCAKey = rsaRootKey
 
-	serverState.subCACert, serverState.subCAPEMCert, serverState.subCAKey, err = certs.GenerateSelfSignedSubCACertAndKey(serverState.rootCACert, serverState.rootCAKey)
+	issuer.SetRootCA(rootCert, pemRootCACert, rsaRootKey)
+
+	err = certs.GenerateSelfSignedSubCACertAndKey()
 	if err != nil {
 		log.Fatalln("Could not initialize Sub CA: ", err)
 	}
@@ -159,12 +144,12 @@ func setupTLSConnection(certDir string) {
 	var err error
 	hostName := getDefaultTLSHost()
 
-	serverState.tlsCertificate, err = certs.GenerateTLSServerCert(hostName, GetSubCACert(), GetSubCAKey())
+	serverState.tlsCertificate, err = certs.GenerateTLSServerCert(hostName)
 	if err != nil {
 		log.Fatalln("Could not initialize TLS: ", err)
 	}
 
-	_, err = certs.GenerateTLSClientCert(hostName, GetSubCACert(), GetSubCAKey(), certDir+"/edgeca-client-cert.pem", certDir+"/edgeca-client-key.pem")
+	_, err = certs.GenerateTLSClientCert(hostName, certDir+"/edgeca-client-cert.pem", certDir+"/edgeca-client-key.pem")
 
 	if err != nil {
 		log.Fatalln("Could not create TLS client cert: ", err)
@@ -172,7 +157,7 @@ func setupTLSConnection(certDir string) {
 
 	filename := certDir + "/CA.pem"
 	log.Infoln("Writing Root CA Certificate to ", filename)
-	cert := GetRootCACert()
+	cert := GetRootCAPEMCert()
 	subCA := GetSubCAPEMCert()
 	certs := make([]byte, len(cert)+len(subCA))
 	copy(certs, cert)
@@ -194,17 +179,19 @@ func InitStateUsingTPP(url, zone, token, certDir string) (err error) {
 	serverState.tppZone = zone
 	serverState.passthrough = false
 
-	serverState.rootCACert, serverState.rootCAPAMCert, serverState.subCACert, serverState.subCAPEMCert, serverState.subCAKey, err =
-		tpp.GenerateTPPRootCACertAndKey(url, zone, token)
+	rootCACert, rootCAPAMCert, subCACert, subCAPEMCert, subCAKey, err := tpp.GenerateTPPRootCACertAndKey(url, zone, token)
 	if err != nil {
 		log.Debugln("Error: Could not initialize Root CA: ", err)
 		return errors.New("TPP Error:" + err.Error())
 	}
 
-	log.Debugln("Root CA Certificate now: ", serverState.rootCACert.Subject.CommonName)
-	log.Debugln("Sub CA Certificate now: ", serverState.subCACert.Subject.CommonName)
+	issuer.SetRootCA(rootCACert, rootCAPAMCert, nil)
+	issuer.SetSubCA(subCACert, subCAPEMCert, subCAKey)
 
-	defaultValues, restrictions, err := tpp.TPPGetPolicy(url, zone, token)
+	log.Debugln("Root CA Certificate now: ", rootCACert.Subject.CommonName)
+	log.Debugln("Sub CA Certificate now: ", subCACert.Subject.CommonName)
+
+	defaultValues, restrictions, _ := tpp.TPPGetPolicy(url, zone, token)
 
 	log.Debugln("TPP Default values from policy:", defaultValues)
 
