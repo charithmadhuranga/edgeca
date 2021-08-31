@@ -143,7 +143,7 @@ func GenerateSignedCertificate(unsignedCertificate *x509.Certificate, parent *x5
 		parentPrivateKey = privateKey
 	}
 
-	derRsaRootCert, err := signCertificateAndDEREncode(unsignedCertificate, parent, privateKey, parentPrivateKey)
+	derRsaRootCert, err := signCertificateAndDEREncode(unsignedCertificate, parent, parentPrivateKey, privateKey)
 	if err != nil {
 		return nil, nil, nil, err
 	}

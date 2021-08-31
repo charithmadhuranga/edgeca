@@ -32,9 +32,9 @@ var label = "edgeca"
 
 func setupHSM() (err error) {
 
-	path, token, pin := config.GetHSMConfiguration()
+	path, token, pin, enabled := config.GetHSMConfiguration()
 
-	if path == "" || token == "" || pin == "" {
+	if path == "" || token == "" || pin == "" || !enabled {
 		return errors.New("HSM is not configured in EdgeCA config file")
 	}
 

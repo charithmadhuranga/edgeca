@@ -70,6 +70,7 @@ type Config struct {
 		TokenLabel    string `yaml:"token-label"`
 		Pin           string `yaml:"pin"`
 		SoftHSMConfig string `yaml:"soft-hsm-config"`
+		Enabled       bool   `yaml:"enabled"`
 	} `yaml:"hsm"`
 }
 
@@ -103,7 +104,7 @@ func setDefaultHSMConfiguration() {
 		log.Fatalf("%v", err)
 	}
 
-	SetHSMConfiguration(library, defaultID, defaultPin)
+	SetHSMConfiguration(library, defaultID, defaultPin, false)
 
 }
 
@@ -164,17 +165,18 @@ func WriteConfigFile() error {
 }
 
 func IsHSMEnaabled() bool {
-	return (defaultConfig.HSM.Path != "" && defaultConfig.HSM.TokenLabel != "" && defaultConfig.HSM.Pin != "")
+	return (defaultConfig.HSM.Enabled)
 }
 
-func GetHSMConfiguration() (path, tokenLabel, pin string) {
-	return defaultConfig.HSM.Path, defaultConfig.HSM.TokenLabel, defaultConfig.HSM.Pin
+func GetHSMConfiguration() (path, tokenLabel, pin string, enabled bool) {
+	return defaultConfig.HSM.Path, defaultConfig.HSM.TokenLabel, defaultConfig.HSM.Pin, defaultConfig.HSM.Enabled
 }
 
-func SetHSMConfiguration(path, tokenLabel, pin string) {
+func SetHSMConfiguration(path, tokenLabel, pin string, enabled bool) {
 	defaultConfig.HSM.Path = path
 	defaultConfig.HSM.TokenLabel = tokenLabel
 	defaultConfig.HSM.Pin = pin
+	defaultConfig.HSM.Enabled = enabled
 }
 func SetCSRConfiguration(o string, ou string, c string, p string, l string) {
 	defaultConfig.Policy.Organization = o

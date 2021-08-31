@@ -32,6 +32,32 @@ func init() {
 
 		}}
 
+	var enableHSMCmd = &cobra.Command{
+		Use:   "enable",
+		Short: "Enable HSM support",
+		Long: `
+			`,
+		Run: func(cmd *cobra.Command, args []string) {
+			config.InitCLIConfiguration(configDir)
+			path, tokenLabel, pin, _ := config.GetHSMConfiguration()
+			config.SetHSMConfiguration(path, tokenLabel, pin, true)
+			config.WriteConfigFile()
+		}}
+	enableHSMCmd.Flags().StringVarP(&configDir, "confdir", "", configDir, "Configuration Directory")
+
+	var disableHSMCmd = &cobra.Command{
+		Use:   "disable",
+		Short: "Disable HSM support",
+		Long: `
+			`,
+		Run: func(cmd *cobra.Command, args []string) {
+			config.InitCLIConfiguration(configDir)
+			path, tokenLabel, pin, _ := config.GetHSMConfiguration()
+			config.SetHSMConfiguration(path, tokenLabel, pin, false)
+			config.WriteConfigFile()
+		}}
+	disableHSMCmd.Flags().StringVarP(&configDir, "confdir", "", configDir, "Configuration Directory")
+
 	var statusCmd = &cobra.Command{
 		Use:   "status",
 		Short: "Show HSM status",
@@ -47,5 +73,7 @@ func init() {
 
 	rootCmd.AddCommand(hsmCmd)
 	hsmCmd.AddCommand(statusCmd)
+	hsmCmd.AddCommand(enableHSMCmd)
+	hsmCmd.AddCommand(disableHSMCmd)
 
 }

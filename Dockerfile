@@ -13,25 +13,48 @@
 #  *
 #  *******************************************************************************/
 
-FROM golang:1.16-alpine AS build_base
 
-RUN apk add --no-cache git gcc libc-dev
+FROM alpine:3.14 as hsm_build
 
+ARG SOFTHSMV2_VERSION=2.6.1
+WORKDIR /tmp/hsm
+
+RUN apk add --no-cache \
+    autoconf \
+    automake \
+    build-base \
+    libtool \
+    openssl-dev \
+  && wget -O SoftHSMv2.tar.gz \
+    https://github.com/opendnssec/SoftHSMv2/archive/${SOFTHSMV2_VERSION}.tar.gz \
+  && tar -xf SoftHSMv2.tar.gz \
+  && cd SoftHSMv2-${SOFTHSMV2_VERSION} \
+  && ./autogen.sh \
+  && ./configure \
+  && make \
+  && make install
+  
+
+FROM golang:1.16-alpine AS edgeca_build
+
+RUN apk add --no-cache git gcc g++
 WORKDIR /tmp/edgeca
 COPY go.mod .
 COPY go.sum .
 RUN go mod download
 ARG version
-
 COPY . .
-
 RUN echo "-X github.com/edgesec-org/edgeca.Version=$version"
 RUN go build -ldflags "-X github.com/edgesec-org/edgeca.Version=$version" -o bin/edgeca ./cmd/edgeca/
 
 # Start fresh from a smaller image
 FROM alpine:3.9 
 
-COPY --from=build_base /tmp/edgeca/bin/edgeca /app/edgeca
+RUN apk add --no-cache libstdc++ musl opensc openssl 
+
+COPY --from=edgeca_build /tmp/edgeca/bin/edgeca /app/edgeca
+COPY --from=hsm_build /usr/local/lib/softhsm /usr/local/lib/softhsm
+COPY --from=hsm_build /usr/local/bin/* /usr/local/bin/
 
 EXPOSE 50025
 
