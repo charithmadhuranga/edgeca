@@ -24,6 +24,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/edgesec-org/edgeca/internal/auth/mtls"
 	"github.com/edgesec-org/edgeca/internal/issuer"
 	certs "github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/policies"
@@ -135,21 +136,16 @@ func InitStateUsingCerts(caCert, caKey, tlsCertDir string) error {
 
 }
 
-func getDefaultTLSHost() string {
-	hostName, _ := os.Hostname()
-	return hostName
-}
-
 func setupTLSConnection(certDir string) {
 	var err error
-	hostName := getDefaultTLSHost()
+	hostName, _ := os.Hostname()
 
-	serverState.tlsCertificate, err = certs.GenerateTLSServerCert(hostName)
+	serverState.tlsCertificate, err = mtls.GenerateTLSServerCert(hostName)
 	if err != nil {
 		log.Fatalln("Could not initialize TLS: ", err)
 	}
 
-	_, err = certs.GenerateTLSClientCert(hostName, certDir+"/edgeca-client-cert.pem", certDir+"/edgeca-client-key.pem")
+	_, err = mtls.GenerateTLSClientCert(hostName, certDir+"/edgeca-client-cert.pem", certDir+"/edgeca-client-key.pem")
 
 	if err != nil {
 		log.Fatalln("Could not create TLS client cert: ", err)

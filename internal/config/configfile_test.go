@@ -24,11 +24,12 @@ func TestConfig(t *testing.T) {
 
 	// delete config file
 	homedir, _ := os.UserHomeDir()
-	filename := homedir + "/.edgeca/config.yaml"
+	homedir += "/.edgeca/"
+	filename := homedir + "config.yaml"
 
 	os.Remove(filename)
 	// initialize - read config - set defaults
-	InitCLIConfiguration()
+	InitCLIConfiguration(homedir)
 
 	// check defaults
 	configGraphQLport := GetGraphQLPort()
@@ -67,7 +68,7 @@ func TestConfig(t *testing.T) {
 	}
 
 	configTLSHostname := GetServerTLSHost()
-	defaultTLSCHostname := getDefaultTLSHost()
+	defaultTLSCHostname, _ := os.Hostname()
 
 	if defaultTLSCHostname == "" {
 		t.Errorf("defaultTLSCHostname is empty")
@@ -145,7 +146,7 @@ func TestConfig(t *testing.T) {
 	}
 
 	// read config file
-	InitCLIConfiguration()
+	InitCLIConfiguration(homedir)
 	// and remove it
 	os.Remove(filename)
 

@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 
+	"github.com/edgesec-org/edgeca/internal/auth/jwt"
 	"github.com/edgesec-org/edgeca/internal/issuer"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph/generated"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph/model"
@@ -21,6 +22,11 @@ func (r *mutationResolver) CreateCertificate(ctx context.Context, input model.Ne
 	var pemCertificate, pemPrivateKey, expiryStr string
 	var subject pkix.Name
 
+	userID := jwt.UserIDFromContext(ctx)
+	if userID == "" {
+		var result model.Certificate
+		return &result, fmt.Errorf("access denied - JWT token missing/invalid")
+	}
 	subject.CommonName = input.CommonName
 
 	if input.Organization != nil {
