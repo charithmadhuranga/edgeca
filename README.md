@@ -7,7 +7,7 @@ It also enables ephemeral certificate-based authorization, which reduces the nee
 
 It is easy to install and simple to use.
 
-- `edgeca server` starts up EdgeCA as a server, which supports mTLS gRPC, GraphQL and Envoy SDS as different ways of providing machine identities.
+- `edgeca server` starts up EdgeCA as a server, which supports mTLS gRPC, GraphQL+JWT and Envoy SDS as different ways of providing machine identities.
 - `edgeca gencsr` generates a CSR file
 - `edgeca gencert` connects to the EdgeCA Server using mTLS gRPC to sign a CSR request and provide a certificate and private key.
 
@@ -17,9 +17,11 @@ EdgeCA can run in a number of modes.
 3. EdgeCA can connect to the [Venafi vCert](https://github.com/Venafi/vcert) TPP backend to get an issuing certificate, which is then used to generate certificates locally. 
 4. It is also possible to disable completely all local certificate signing and have EdgeCA pass all signing requests directly on to the Venafi back-end.
 
+Other features include SoftHSM support.
+
 EdgeCA is a flexible open source solution, written in Go, and licenced with the Apache 2.0 Licence
 
-For more information see the [EdgeCA Wiki pages](https://github.com/edgesec-org/edgeca/wiki). 
+For more information see the [EdgeCA Wiki pages](https://github.com/edgesec-org/edgeca/wiki) or watch the [EdgeCA Youtube playlist](https://youtube.com/playlist?list=PLrqtHqvSQXHSBCaIUjNQQhg9fN0pk5AYp)
 
 The easiest way to install the application is to use [snaps](./snap)
 
