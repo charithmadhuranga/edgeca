@@ -91,6 +91,10 @@ func setupSoftHSMLibrary() (string, error) {
 		return "/usr/lib/softhsm/libsofthsm2.so", nil
 	} else if _, err := os.Stat("/usr/local/lib/softhsm/libsofthsm2.so"); err == nil {
 		return "/usr/local/lib/softhsm/libsofthsm2.so", nil
+	} else if _, err := os.Stat("/usr/local/lib/softhsm/libsofthsm2.so"); err == nil {
+		return "/usr/local/lib/softhsm/libsofthsm2.so", nil
+	} else if _, err := os.Stat("/snap/edgeca/current/usr/lib/softhsm/libsofthsm2.so"); err == nil {
+		return "/snap/edgeca/current/usr/lib/softhsm/libsofthsm2.so", nil
 	} else {
 		return "", errors.New("can't find libsofthsm2.so")
 	}

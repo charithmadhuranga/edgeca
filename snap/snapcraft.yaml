@@ -19,7 +19,7 @@ apps:
 parts:
   version:
     plugin: nil
-    source: .
+    source: snap/local/
     override-pull: |
       cd $SNAPCRAFT_PROJECT_DIR
       VERSION=$(git describe --tags --abbrev=0 | sed 's/^.//')
@@ -42,4 +42,25 @@ parts:
       cd $SNAPCRAFT_PART_SRC
       make
       install -DT "./bin/edgeca" "$SNAPCRAFT_PART_INSTALL/bin/edgeca" 
-  
+
+  softhsm:
+    source: .
+    plugin: make 
+    build-packages:
+      - autoconf
+      - automake
+      - libtool
+      - libssl-dev
+      - wget
+    override-build: |
+      cd $SNAPCRAFT_PART_SRC
+      SOFTHSMV2_VERSION=2.6.1
+      wget -O SoftHSMv2.tar.gz https://github.com/opendnssec/SoftHSMv2/archive/${SOFTHSMV2_VERSION}.tar.gz
+      tar -xf SoftHSMv2.tar.gz
+      cd SoftHSMv2-${SOFTHSMV2_VERSION}
+      ./autogen.sh
+      ./configure
+      make
+      install -D $SNAPCRAFT_PART_SRC/SoftHSMv2-${SOFTHSMV2_VERSION}/src/lib/.libs/libsofthsm2.so $SNAPCRAFT_PART_INSTALL/usr/lib/softhsm/libsofthsm2.so  
+      # ranlib /usr/local/lib/softhsm/libsofthsm2.a
+
