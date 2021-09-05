@@ -23,18 +23,33 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/edgesec-org/edgeca/internal/auth/jwt"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph"
 	"github.com/edgesec-org/edgeca/internal/server/graphqlimpl/graph/generated"
+	"github.com/go-chi/chi"
 )
+
+func initJWTToken() {
+	token, _ := jwt.GenerateToken()
+	log.Infof("Use the following HTTP header for GraphQL JWT authentication:\n{\"Authorization\": \"%s\"}", token)
+
+}
 
 //StartGraphqlServer starts up the graphql server
 func StartGraphqlServer(port int) {
+
+	initJWTToken()
+
 	sPort := strconv.Itoa(port)
+
+	router := chi.NewRouter()
+	router.Use(jwt.Middleware())
+
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{}}))
 
-	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.Handle("/query", srv)
+	router.Handle("/", playground.Handler("GraphQL playground", "/query"))
+	router.Handle("/query", srv)
 
 	log.Debugf("connect to http://localhost:%s/ for GraphQL playground", sPort)
-	log.Fatal(http.ListenAndServe(":"+sPort, nil))
+	log.Fatal(http.ListenAndServe(":"+sPort, router))
 }

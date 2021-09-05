@@ -55,7 +55,7 @@ func TestCertificates(t *testing.T) {
 		t.Fatalf("GetEdgeRootCASigner %v", err)
 	}
 
-	config.SetHSMConfiguration("", "", "")
+	config.SetHSMConfiguration("", "", "", false)
 	hsm.ResetConfiguration()
 
 	_, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")

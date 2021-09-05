@@ -7,7 +7,9 @@ require (
 	github.com/ThalesIgnite/crypto11 v1.2.4
 	github.com/Venafi/vcert/v4 v4.13.1
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
+	github.com/go-chi/chi v3.3.2+incompatible
 	github.com/gogo/protobuf v1.2.1
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/open-policy-agent/opa v0.27.1
 	github.com/prometheus/common v0.14.0

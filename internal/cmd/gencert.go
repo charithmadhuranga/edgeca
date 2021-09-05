@@ -26,8 +26,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/edgesec-org/edgeca"
+	"github.com/edgesec-org/edgeca/internal/auth/mtls"
 	"github.com/edgesec-org/edgeca/internal/config"
-	certs "github.com/edgesec-org/edgeca/internal/issuer"
 	internalgrpc "github.com/edgesec-org/edgeca/internal/server/grpcimpl"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -133,7 +133,7 @@ func grpcConnect(tlsCertDir, host string, port int) (*grpc.ClientConn, internalg
 
 	log.Debugln("Loading TLS certificates from " + tlsCertDir)
 
-	certPool, err := certs.LoadCAServerCert(tlsCertDir + "/CA.pem")
+	certPool, err := mtls.LoadCAServerCert(tlsCertDir + "/CA.pem")
 	if err != nil {
 		log.Fatalf("Could not load CA certificate for TLS connection: %s", err)
 	}

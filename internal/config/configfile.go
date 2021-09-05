@@ -133,7 +133,7 @@ func InitCLIConfiguration(configDir string) {
 		WriteConfigFile()
 
 	} else {
-		log.Infof("Loading configuration file : %s", configFile)
+		log.Debugf("Loading configuration file : %s", configFile)
 
 		yamlFile, err := ioutil.ReadFile(configFile)
 		if err != nil {

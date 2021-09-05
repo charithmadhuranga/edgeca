@@ -31,22 +31,42 @@ var configTLSPort int
 var configTLSHostname string
 var configPolicy, configCACert, configCAKey, configTlsCertDir string
 var configDebugLogging bool
-
+var configGraphQLEnabled bool
 var err error
 var confconfigDir string
 
 func init() {
 
+	configCmd := initConfigCommand()
+	confconfigDir = config.GetDefaultConfdir()
+
+	initConfigListCmd(configCmd)
+	initConfigSelfSignedCmd(configCmd)
+	initConfigUserProvidedCmd(configCmd)
+	initConfigIssuingCertCmd(configCmd)
+	initConfigPassthroughCmd(configCmd)
+	initConfigGRPCCmd(configCmd)
+	initProtocolCmd(configCmd)
+	initGrahQLCmd(configCmd)
+
+}
+
+func initConfigCommand() *cobra.Command {
+
 	var configCmd = &cobra.Command{
 		Use:   "config",
 		Short: "Configure EdgeCA",
 		Long: `Configuration settings
-		 `,
+		`,
 		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 
 		}}
+	rootCmd.AddCommand(configCmd)
+	return configCmd
+}
 
+func initConfigListCmd(configCmd *cobra.Command) {
 	var listCmd = &cobra.Command{
 		Use:   "list",
 		Short: "List current settings",
@@ -57,6 +77,10 @@ func init() {
 			fmt.Println(config.GetConfigurationFileContents())
 		}}
 	listCmd.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
+	configCmd.AddCommand(listCmd)
+}
+
+func initConfigSelfSignedCmd(configCmd *cobra.Command) {
 
 	var serverModeSelfSignedCmd = &cobra.Command{
 		Use:   "self-signed",
@@ -79,7 +103,13 @@ and optionally reads in an OPA policy file.
 			config.SetPolicyFile(configPolicy)
 			config.WriteConfigFile()
 		}}
+	configCmd.AddCommand(serverModeSelfSignedCmd)
+	serverModeSelfSignedCmd.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
+	serverModeSelfSignedCmd.Flags().StringVarP(&configPolicy, "policy", "p", config.GetPolicyFile(), "OPA Policy Filename")
 
+}
+
+func initConfigUserProvidedCmd(configCmd *cobra.Command) {
 	var serverModeUserProvided = &cobra.Command{
 		Use:   "user-provided",
 		Short: "User-provided CA certificate mode",
@@ -103,6 +133,17 @@ from the provided PEM files and optionally reads in an OPA policy file
 			config.WriteConfigFile()
 		}}
 
+	configCmd.AddCommand(serverModeUserProvided)
+	serverModeUserProvided.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
+	serverModeUserProvided.Flags().StringVarP(&configPolicy, "policy", "p", config.GetPolicyFile(), "OPA Policy Filename")
+	serverModeUserProvided.Flags().StringVarP(&configCACert, "ca-cert", "c", configCACert, "User-provided CA Certificate File")
+	serverModeUserProvided.Flags().StringVarP(&configCAKey, "ca-key", "k", configCAKey, "User-provided CA Private Key File")
+	serverModeUserProvided.MarkFlagRequired("ca-key")
+	serverModeUserProvided.MarkFlagRequired("ca-cert")
+}
+
+func initConfigIssuingCertCmd(configCmd *cobra.Command) {
+
 	var serverModeIssuingCert = &cobra.Command{
 		Use:   "issuing-certificate",
 		Short: "issuing-certificate mode",
@@ -122,7 +163,17 @@ It reads in the policy and default configuration from the TPP server
 			config.SetTPPCredentials(configToken, configURL, configZone)
 			config.WriteConfigFile()
 		}}
+	configCmd.AddCommand(serverModeIssuingCert)
+	serverModeIssuingCert.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
+	serverModeIssuingCert.Flags().StringVarP(&configToken, "token", "t", configToken, "Venafi TPP Token")
+	serverModeIssuingCert.Flags().StringVarP(&configURL, "url", "u", configURL, "Venafi TPP URL")
+	serverModeIssuingCert.Flags().StringVarP(&configZone, "zone", "z", configZone, "Venafi TPP Zone")
+	serverModeIssuingCert.MarkFlagRequired("token")
+	serverModeIssuingCert.MarkFlagRequired("url")
+	serverModeIssuingCert.MarkFlagRequired("zone")
+}
 
+func initConfigPassthroughCmd(configCmd *cobra.Command) {
 	var serverModePassthrough = &cobra.Command{
 		Use:   "tpp-passthrough",
 		Short: "tpp-passthrough mode",
@@ -144,6 +195,18 @@ using TPP.
 			config.SetTPPCredentials(configToken, configURL, configZone)
 			config.WriteConfigFile()
 		}}
+	configCmd.AddCommand(serverModePassthrough)
+	serverModePassthrough.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
+	serverModePassthrough.Flags().StringVarP(&configToken, "token", "t", configToken, "Venafi TPP Token")
+	serverModePassthrough.Flags().StringVarP(&configURL, "url", "u", configURL, "Venafi TPP URL")
+	serverModePassthrough.Flags().StringVarP(&configZone, "zone", "z", configZone, "Venafi TPP Zone")
+	serverModePassthrough.MarkFlagRequired("token")
+	serverModePassthrough.MarkFlagRequired("url")
+	serverModePassthrough.MarkFlagRequired("zone")
+
+}
+
+func initConfigGRPCCmd(configCmd *cobra.Command) {
 
 	var grpcCmd = &cobra.Command{
 		Use:   "grpc",
@@ -156,7 +219,15 @@ using TPP.
 			config.SetServerTLSHost(configTLSHostname)
 			config.WriteConfigFile()
 		}}
+	configCmd.AddCommand(grpcCmd)
+	grpcCmd.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
+	grpcCmd.Flags().IntVarP(&configTLSPort, "port", "", 50025, "TCP/IP port to use for EdgeCA gRPC server")
+	grpcCmd.Flags().StringVarP(&configTLSHostname, "server", "", config.GetDefaultTLSHost(), "EdgeCA gRPC server hostname")
+	grpcCmd.MarkFlagRequired("port")
+	grpcCmd.MarkFlagRequired("server")
+}
 
+func initProtocolCmd(configCmd *cobra.Command) {
 	var protocolCmd = &cobra.Command{
 		Use:   "protocols",
 		Short: "other protocol settings",
@@ -165,57 +236,35 @@ using TPP.
 		Run: func(cmd *cobra.Command, args []string) {
 			config.InitCLIConfiguration(confconfigDir)
 			config.SetUseSDS(configSDS)
-			config.SetGraphQLPort(configGraphQLport)
 			config.WriteConfigFile()
 		}}
-
-	rootCmd.AddCommand(configCmd)
-	configCmd.AddCommand(serverModeSelfSignedCmd)
-	configCmd.AddCommand(listCmd)
-	configCmd.AddCommand(serverModeUserProvided)
-	configCmd.AddCommand(serverModeIssuingCert)
-	configCmd.AddCommand(serverModePassthrough)
-	configCmd.AddCommand(grpcCmd)
 	configCmd.AddCommand(protocolCmd)
-
-	confconfigDir = config.GetDefaultConfdir()
-
-	serverModeSelfSignedCmd.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
-	serverModeSelfSignedCmd.Flags().StringVarP(&configPolicy, "policy", "p", config.GetPolicyFile(), "OPA Policy Filename")
-
-	serverModeUserProvided.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
-	serverModeUserProvided.Flags().StringVarP(&configPolicy, "policy", "p", config.GetPolicyFile(), "OPA Policy Filename")
-	serverModeUserProvided.Flags().StringVarP(&configCACert, "ca-cert", "c", configCACert, "User-provided CA Certificate File")
-	serverModeUserProvided.Flags().StringVarP(&configCAKey, "ca-key", "k", configCAKey, "User-provided CA Private Key File")
-	serverModeUserProvided.MarkFlagRequired("ca-key")
-	serverModeUserProvided.MarkFlagRequired("ca-cert")
-
-	serverModeIssuingCert.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
-	serverModeIssuingCert.Flags().StringVarP(&configToken, "token", "t", configToken, "Venafi TPP Token")
-	serverModeIssuingCert.Flags().StringVarP(&configURL, "url", "u", configURL, "Venafi TPP URL")
-	serverModeIssuingCert.Flags().StringVarP(&configZone, "zone", "z", configZone, "Venafi TPP Zone")
-	serverModeIssuingCert.MarkFlagRequired("token")
-	serverModeIssuingCert.MarkFlagRequired("url")
-	serverModeIssuingCert.MarkFlagRequired("zone")
-
-	serverModePassthrough.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
-	serverModePassthrough.Flags().StringVarP(&configToken, "token", "t", configToken, "Venafi TPP Token")
-	serverModePassthrough.Flags().StringVarP(&configURL, "url", "u", configURL, "Venafi TPP URL")
-	serverModePassthrough.Flags().StringVarP(&configZone, "zone", "z", configZone, "Venafi TPP Zone")
-	serverModePassthrough.MarkFlagRequired("token")
-	serverModePassthrough.MarkFlagRequired("url")
-	serverModePassthrough.MarkFlagRequired("zone")
-
-	grpcCmd.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
-	grpcCmd.Flags().IntVarP(&configTLSPort, "port", "", 50025, "TCP/IP port to use for EdgeCA gRPC server")
-	grpcCmd.Flags().StringVarP(&configTLSHostname, "server", "", config.GetDefaultTLSHost(), "EdgeCA gRPC server hostname")
-	grpcCmd.MarkFlagRequired("port")
-	grpcCmd.MarkFlagRequired("server")
-
 	protocolCmd.Flags().StringVarP(&confconfigDir, "confdir", "", confconfigDir, "Configuration Directory")
-	protocolCmd.Flags().IntVarP(&configGraphQLport, "graphql-port", "", 0, "If set, enable GraphQL server on this TCP/IP port")
 	protocolCmd.Flags().BoolVarP(&configSDS, "enable-sds", "", false, "Enable experimental Envoy SDS support")
 	protocolCmd.MarkFlagRequired("enable-sds")
-	protocolCmd.MarkFlagRequired("graphql-port")
+}
+
+func initGrahQLCmd(configCmd *cobra.Command) {
+	var graphqlCmd = &cobra.Command{
+		Use:   "graphql",
+		Short: "Configure GraphQL",
+		Long: `
+			`,
+		Run: func(cmd *cobra.Command, args []string) {
+			config.InitCLIConfiguration(confconfigDir)
+			if configGraphQLport == 0 {
+				configCmd.Println("GraphQL Disabled")
+			} else {
+				configCmd.Printf("GraphQL Enabled on port %d and gRPC disabled\n", configGraphQLport)
+			}
+			config.SetGraphQLPort(configGraphQLport)
+			config.WriteConfigFile()
+
+		}}
+
+	configCmd.AddCommand(graphqlCmd)
+	graphqlCmd.Flags().StringVarP(&confconfigDir, "confdir", "c", confconfigDir, "Configuration Directory")
+	graphqlCmd.Flags().IntVarP(&configGraphQLport, "port", "p", 0, "GraphQL server TCP/IP port. Setting the port to 0 disables GraphQL")
+	graphqlCmd.MarkFlagRequired("port")
 
 }

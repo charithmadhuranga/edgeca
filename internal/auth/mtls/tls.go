@@ -13,7 +13,7 @@
  *
  *******************************************************************************/
 
-package issuer
+package mtls
 
 import (
 	"crypto/tls"
@@ -22,6 +22,7 @@ import (
 	"errors"
 	"io/ioutil"
 
+	"github.com/edgesec-org/edgeca/internal/issuer"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,7 +37,7 @@ func GenerateTLSServerCert(server string) (*tls.Certificate, error) {
 		Country:            []string{},
 	}
 
-	pemCert, pemKey, _, err := GeneratePemCertificate(subject, false)
+	pemCert, pemKey, _, err := issuer.GeneratePemCertificate(subject, false)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func GenerateTLSClientCert(server string, certfilename string, keyfilename strin
 		Country:            []string{},
 	}
 
-	pemCert, pemKey, _, err := GeneratePemCertificate(subject, false)
+	pemCert, pemKey, _, err := issuer.GeneratePemCertificate(subject, false)
 	if err != nil {
 		return nil, err
 	}
