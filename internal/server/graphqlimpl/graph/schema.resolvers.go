@@ -66,7 +66,8 @@ func (r *mutationResolver) CreateCertificate(ctx context.Context, input model.Ne
 	}
 
 	var result model.Certificate
-	result.Certificate = pemCertificate
+	var subCACert = string(state.GetSubCAPEMCert())
+	result.Certificate = pemCertificate + subCACert
 	result.Expiry = expiryStr
 	result.Key = pemPrivateKey
 	return &result, err
