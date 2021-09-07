@@ -83,8 +83,20 @@ func (s *server) GenerateCertificate(ctx context.Context, request *grpcimpl.Cert
 		pemPrivateKey = string(bPrivateKey)
 
 	}
+	// from https://datatracker.ietf.org/doc/html/rfc4346#section-7.4.1.2 and https://datatracker.ietf.org/doc/html/rfc8446#section-4.4.2
+	/*
+		certificate_list
+			This is a sequence (chain) of X.509v3 certificates.  The sender's
+			certificate must come first in the list.  Each following
+			certificate must directly certify the one preceding it.  Because
+			certificate validation requires that root keys be distributed
+			independently, the self-signed certificate that specifies the root
+			certificate authority may optionally be omitted from the chain,
+			under the assumption that the remote end must already possess it
+			in order to validate it in any case.
+	*/
 
-	return &grpcimpl.CertificateReply{Certificate: /*string(state.GetSubCAPEMCert()) +*/ pemCertificate, PrivateKey: pemPrivateKey}, err
+	return &grpcimpl.CertificateReply{Certificate: pemCertificate + string(state.GetSubCAPEMCert()), PrivateKey: pemPrivateKey}, err
 }
 
 //StartGrpcServer starts up the gRPC server
