@@ -15,7 +15,12 @@ apps:
     command: bin/edgeca 
     plugs: [home, network, network-bind]
  
-
+  edgeca-server:
+    adapter: none
+    daemon: simple
+    command: bin/edgeca server
+    plugs: [home, network, network-bind]
+    
 parts:
   version:
     plugin: nil
