@@ -19,7 +19,7 @@ The snap package starts up an instance of the edgeca server as a background proc
 
 
 ```
-$ sudo snap stop edgeca.edgeca-server 
+
 $ sudo edgeca config graphql -p 8888
 $ sudo snap restart edgeca.edgeca-server
 ```
