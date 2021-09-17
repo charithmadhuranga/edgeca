@@ -176,7 +176,7 @@ func startEdgeCAServer() {
 
 func getTLSCertDir() string {
 
-	defaultTLSCertDir := configDir + "/certs"
+	defaultTLSCertDir := configDir
 
 	if _, err := os.Stat(defaultTLSCertDir); os.IsNotExist(err) {
 		_ = os.Mkdir(defaultTLSCertDir, 0755)

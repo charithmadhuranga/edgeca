@@ -12,15 +12,15 @@ confinement: strict
 apps:
   edgeca:
     adapter: none
-    command: bin/edgeca 
+    command: bin/edgeca --confdir /var/snap/edgeca/current
     plugs: [home, network, network-bind]
  
   edgeca-server:
     adapter: none
     daemon: simple
-    command: bin/edgeca server
+    command: bin/edgeca server --confdir /var/snap/edgeca/current
     plugs: [home, network, network-bind]
-    
+
 parts:
   version:
     plugin: nil
