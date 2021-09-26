@@ -11,6 +11,7 @@ require (
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/protobuf v1.5.2
+	github.com/google/uuid v1.1.2
 	github.com/open-policy-agent/opa v0.27.1
 	github.com/prometheus/common v0.14.0
 	github.com/sirupsen/logrus v1.6.0

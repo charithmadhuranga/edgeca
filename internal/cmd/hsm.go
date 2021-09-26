@@ -27,7 +27,11 @@ func init() {
 	var hsmCmd = &cobra.Command{
 		Use:   "hsm",
 		Short: "HSM commands",
-		Args:  cobra.MinimumNArgs(1),
+		Long: `Utility methods to access the HSM.
+Enable HSM with 
+	edgeca config hsm --enable
+`,
+		Args: cobra.MinimumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 
 		}}

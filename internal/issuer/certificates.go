@@ -166,9 +166,11 @@ func GeneratePemCertificate(subject pkix.Name, possiblyUseHSM bool) (pemCertific
 
 	if config.IsHSMEnaabled() {
 		if possiblyUseHSM {
+			var keyReference string
 			log.Debugf("Signing Certificate for %s using HSM - and storing key in HSM", subject.CommonName)
-			_, pemCertificate, err = GenerateHSMSignedCertificate(certificate, subject.CommonName, subCACert, "EDGECA-SUB-CA")
-			pemPrivateKey = []byte("STORED IN HSM")
+			_, pemCertificate, keyReference, err = GenerateHSMSignedCertificate(certificate, subject.CommonName, subCACert, "EDGECA-SUB-CA")
+
+			pemPrivateKey = []byte(keyReference)
 		} else {
 			log.Debugf("Signing Certificate for %s using HSM - and storing private key in EdgeCA", subject.CommonName)
 			var serverKey *rsa.PrivateKey
@@ -200,7 +202,7 @@ func GenerateSelfSignedRootCACertAndKey() (err error) {
 		log.Debugf("Generating self signed Root CA Certificate using HSM")
 
 		rootCAPrivateKey = nil
-		rootCACert, rootCAPEMCert, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
+		rootCACert, rootCAPEMCert, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
 
 		if err != nil {
 			return err
@@ -227,7 +229,7 @@ func GenerateSelfSignedSubCACertAndKey() (err error) {
 		log.Debugf("Generating self signed Sub CA Certificate using HSM")
 
 		subCAPrivateKey = nil
-		subCACert, subCAPEMCert, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-SUB-CA", rootCACert, "EDGECA-ROOT-CA")
+		subCACert, subCAPEMCert, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-SUB-CA", rootCACert, "EDGECA-ROOT-CA")
 
 		if err != nil {
 			return err
