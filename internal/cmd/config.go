@@ -34,6 +34,7 @@ var configDebugLogging bool
 var configGraphQLEnabled bool
 var err error
 var confconfigDir string
+var enableHSM bool
 
 func init() {
 
@@ -48,6 +49,7 @@ func init() {
 	initConfigGRPCCmd(configCmd)
 	initProtocolCmd(configCmd)
 	initGrahQLCmd(configCmd)
+	initConfigHSMCmd(configCmd)
 
 }
 
@@ -64,6 +66,25 @@ func initConfigCommand() *cobra.Command {
 		}}
 	rootCmd.AddCommand(configCmd)
 	return configCmd
+}
+
+func initConfigHSMCmd(configCmd *cobra.Command) {
+
+	var hsmCmd = &cobra.Command{
+		Use:   "hsm",
+		Short: "HSM configuration",
+		Run: func(cmd *cobra.Command, args []string) {
+			config.InitCLIConfiguration(configDir)
+			path, tokenLabel, pin, _ := config.GetHSMConfiguration()
+			config.SetHSMConfiguration(path, tokenLabel, pin, enableHSM)
+			config.WriteConfigFile()
+			cmd.Printf("HSM support set to:%v\n", enableHSM)
+
+		}}
+
+	configCmd.AddCommand(hsmCmd)
+	hsmCmd.Flags().StringVarP(&configDir, "confdir", "", configDir, "Configuration Directory")
+	hsmCmd.Flags().BoolVarP(&enableHSM, "enabled", "e", false, "Enable HSM Support")
 }
 
 func initConfigListCmd(configCmd *cobra.Command) {

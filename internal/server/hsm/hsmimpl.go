@@ -23,12 +23,11 @@ import (
 
 	"github.com/ThalesIgnite/crypto11"
 	"github.com/edgesec-org/edgeca/internal/config"
+	"github.com/google/uuid"
 	"github.com/prometheus/common/log"
 )
 
 var ctx *crypto11.Context
-
-var label = "edgeca"
 
 func setupHSM() (err error) {
 
@@ -57,6 +56,26 @@ func ResetConfiguration() {
 	ctx = nil
 }
 
+func NewHSMSigner(labelString string) (signer crypto.Signer, id []byte, err error) {
+
+	if ctx == nil {
+		err = setupHSM()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	label := []byte(labelString)
+	idUUID := []byte(uuid.New().String())
+	signerDecryptor, err := ctx.GenerateRSAKeyPairWithLabel(idUUID, label, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return crypto.Signer(signerDecryptor), idUUID, err
+
+}
+
 func GetHSMSigner(signerName string) (signer crypto.Signer, err error) {
 
 	if ctx == nil {
@@ -66,19 +85,9 @@ func GetHSMSigner(signerName string) (signer crypto.Signer, err error) {
 		}
 	}
 
-	ID := []byte(signerName)
+	label := []byte(signerName)
 
-	signer, err = ctx.FindKeyPair(ID, []byte(label))
-
-	if signer == nil {
-		_, err = ctx.GenerateRSAKeyPairWithLabel(ID, []byte(label), 2048)
-		if err != nil {
-			return nil, err
-		}
-
-		signer, err = ctx.FindKeyPair(ID, nil)
-	}
-
+	signer, err = ctx.FindKeyPair(nil, label)
 	return signer, err
 
 }

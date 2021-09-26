@@ -45,12 +45,12 @@ func TestCertificates(t *testing.T) {
 
 	unsignedCertificate, _ := generateX509ertificate(root, x509.KeyUsageCertSign|x509.KeyUsageCRLSign, true)
 
-	parentCertificate, _, err := GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
+	parentCertificate, _, _, err := GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
 	if err != nil {
 		t.Fatalf("GetEdgeRootCASigner %v", err)
 	}
 
-	_, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-SUB-CA", parentCertificate, "EDGECA-ROOT-CA")
+	_, _, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-SUB-CA", parentCertificate, "EDGECA-ROOT-CA")
 	if err != nil {
 		t.Fatalf("GetEdgeRootCASigner %v", err)
 	}
@@ -58,7 +58,7 @@ func TestCertificates(t *testing.T) {
 	config.SetHSMConfiguration("", "", "", false)
 	hsm.ResetConfiguration()
 
-	_, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
+	_, _, _, err = GenerateHSMSignedCertificate(unsignedCertificate, "EDGECA-ROOT-CA", nil, "")
 	if err == nil {
 		t.Fatalf("GenerateHSMSignedCertificate should fail when HSM isn't set up")
 	}

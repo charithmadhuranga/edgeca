@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -40,9 +39,7 @@ func generateX509ertificate(subject pkix.Name, keyUsage x509.KeyUsage, isCA bool
 	notBefore := time.Now()
 	notAfter := notBefore.AddDate(1, 0, 0)
 
-	var cert x509.Certificate
-
-	cert = x509.Certificate{
+	cert := x509.Certificate{
 		SerialNumber:          &serialNumber,
 		Subject:               subject,
 		DNSNames:              []string{subject.CommonName},
@@ -58,18 +55,18 @@ func generateX509ertificate(subject pkix.Name, keyUsage x509.KeyUsage, isCA bool
 	//	}
 
 	serialNumber.Add(&serialNumber, big.NewInt(1))
-	notAfterStr := fmt.Sprintf(cert.NotAfter.Format(time.RFC3339))
+	notAfterStr := cert.NotAfter.Format(time.RFC3339)
 
 	return &cert, notAfterStr
 
 }
 
-func GenerateHSMSignedCertificate(unsignedCertificate *x509.Certificate, signerName string, parent *x509.Certificate, parentSignerName string) (*x509.Certificate, []byte, error) {
+func GenerateHSMSignedCertificate(unsignedCertificate *x509.Certificate, signerName string, parent *x509.Certificate, parentSignerName string) (*x509.Certificate, []byte, string, error) {
 
-	signer, err := hsm.GetHSMSigner(signerName)
+	signer, id, err := hsm.NewHSMSigner(signerName)
 	if err != nil {
-		log.Debugln("GenerateHSMSignedCertificate failed:", err)
-		return nil, nil, err
+		log.Errorln("GenerateHSMSignedCertificate failed:", err)
+		return nil, nil, "", err
 	}
 
 	var parentSigner crypto.Signer
@@ -81,24 +78,31 @@ func GenerateHSMSignedCertificate(unsignedCertificate *x509.Certificate, signerN
 		parentSigner, err = hsm.GetHSMSigner(parentSignerName)
 		if err != nil {
 			log.Debugln("GenerateHSMSignedCertificate failed:", err)
-			return nil, nil, err
+			return nil, nil, "", err
 		}
 	}
 	derRsaRootCert, err := x509.CreateCertificate(rand.Reader, unsignedCertificate, parent, signer.Public(), parentSigner)
 
 	if err != nil {
 		log.Debugln("GenerateHSMSignedCertificate failed:", err)
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	certificate, err := x509.ParseCertificate(derRsaRootCert)
 	if err != nil {
 		log.Debugln("GenerateHSMSignedCertificate failed:", err)
-		return nil, nil, err
+		return nil, nil, "", err
+	}
+
+	var hsmReference string
+	if id == nil {
+		hsmReference = "HSM"
+	} else {
+		hsmReference = "HSM ID:" + string(id)
 	}
 
 	pemCACert := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derRsaRootCert})
-	return certificate, pemCACert, nil
+	return certificate, pemCACert, hsmReference, nil
 
 }
 
